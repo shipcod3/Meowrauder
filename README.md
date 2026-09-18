@@ -2,9 +2,7 @@
 
 <p align="center"><img src="docs/icon/meowrauder.png" width="160" alt="Meowrauder icon"></p>
 
-A **Marauder-style RF reconnaissance suite** for the [MeowKit-S3](https://meowkit.cc)
-(ESP32-S3) pocket multi-tool, built as a native signed app for the
-[FeralCat](https://github.com/FeralDevs/FeralCat) firmware.
+A **Marauder-style RF reconnaissance suite** for the [MeowKit-S3](https://meowkit.cc) (ESP32-S3) pocket multi-tool, built as a native app for the [FeralCat](https://github.com/FeralDevs/FeralCat) firmware.
 
 > ## ⚠️ Authorised use only
 > Everything here except one function is **receive-only** — it listens and
