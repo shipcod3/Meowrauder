@@ -1,0 +1,16 @@
+# build output
+sim/build/
+build/
+*.o
+*.bmp
+
+# local scratch
+shots/
+*.pcap
+*.22000
+
+# ...but the committed evidence samples are deliberate. Without these
+# negations the *.pcap rule silently dropped docs/samples/sample-capture.pcap,
+# which README, HANDOVER and CHANGELOG all cite.
+!docs/samples/
+!docs/samples/**

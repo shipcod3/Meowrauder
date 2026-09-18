@@ -1,0 +1,83 @@
+diff --git a/src/app/launcher/launcher.cpp b/src/app/launcher/launcher.cpp
+index 16d5a08..c5e4df8 100644
+--- a/src/app/launcher/launcher.cpp
++++ b/src/app/launcher/launcher.cpp
+@@ -320,6 +320,40 @@ void Launcher::onLoop()
+                 loadAppsMenu();
+             }
+         }
++        /* ── Native /apps catalog ───────────────────────────────────────
++         * The scan touches the SD so it stays off the boot path, but it must
++         * not wait for the user to open the Apps menu either. Run it from the
++         * loop as soon as the card is ready, and again whenever the card comes
++         * back — an insert, or the SD_MMC remount after a USB MSC session.
++         * Previously a scan that ran while the card was unavailable latched an
++         * empty catalog until the next reboot, hiding every tile. */
++        {
++            const bool mscActive = usb_msc_is_active() != 0;
++            if (_nativeUsbWasActive && !mscActive) _nativeScanned = false;
++            _nativeUsbWasActive = mscActive;
++
++            if (!_sd_ready || mscActive) {
++                _nativeScanAt = 0;                  /* restart the settle window */
++            } else if (!_nativeScanned) {
++                if (!_nativeScanAt) _nativeScanAt = millis();
++                if (millis() - _nativeScanAt >= 250) {   /* let a fresh mount settle */
++                    native_apps_scan();
++                    _nativeScanned   = true;
++                    _nativeScanAt    = 0;
++                    _nativeMenuDirty = true;
++                }
++            }
++            /* Rebuild the grid only between animations and with no pending
++             * selection — same guard the Lua catalog rebuild uses. */
++            if (_nativeMenuDirty) {
++                lv_disp_t* d = lv_disp_get_default();
++                if (d && !d->scr_to_load && !ui_apps_menu_get_selected_id()) {
++                    _nativeMenuDirty = false;
++                    loadAppsMenu();
++                }
++            }
++        }
++
+         /* ── GUI state: LVGL active ── */
+         /* Drive LED animation (BREATHING / BLINK) — must tick every loop. */
+         _device->led.update();
+@@ -684,7 +718,8 @@ void Launcher::updateStatusBar()
+         if (sd_present != _sd_ready) {
+             mk_event_push(sd_present ? MK_EVT_SD_INSERTED : MK_EVT_SD_REMOVED);
+             if (_luaApps && !usb_msc_is_active()) _luaApps->refreshCatalog();
+-            _nativeScanned = false;   /* re-scan /apps next time the Apps menu opens */
++            _nativeScanned = false;   /* card changed → catalog is stale */
++            _nativeScanAt  = 0;       /* restart the settle window */
+         }
+         _sd_ready = sd_present;
+         if (ui_sd_on && ui_sd_null) {
+@@ -850,7 +885,10 @@ void Launcher::processNavEvents()
+                 /* Lazy /apps scan: first time the Apps menu is opened, scan the
+                  * SD and rebuild the grid with native tiles (kept off the boot
+                  * path so boot stays fast). */
+-                if (!_nativeScanned) {
++                /* Fallback only — onLoop normally scans well before this.
++                 * Never latch while the card is absent: that is what used to
++                 * hide every tile until the next reboot. */
++                if (!_nativeScanned && _sd_ready) {
+                     native_apps_scan();
+                     _nativeScanned = true;
+                     loadAppsMenu();
+diff --git a/src/app/launcher/launcher.h b/src/app/launcher/launcher.h
+index 0b2dbb9..4e3d416 100644
+--- a/src/app/launcher/launcher.h
++++ b/src/app/launcher/launcher.h
+@@ -45,7 +45,10 @@ private:
+     bool _lvgl_inited    = false;   /* lv_init + drivers done (one-time) */
+     bool _ui_ready       = false;   /* UI screens exist (stays true after buildUI) */
+     bool _app_running    = false;
+-    bool _nativeScanned  = false;   /* /apps scanned once (lazy, off the boot path) */
++    bool _nativeScanned  = false;   /* /apps catalog is current for this card   */
++    bool _nativeMenuDirty = false;  /* catalog changed; rebuild grid when safe   */
++    bool _nativeUsbWasActive = false; /* MSC held the SD last loop (SD_MMC down) */
++    uint32_t _nativeScanAt = 0;     /* settle-window start for a pending scan    */
+     int  _running_app_id = -1;
+ 
+     /* SD card (mounted via SD_MMC native API) */

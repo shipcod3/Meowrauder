@@ -1,0 +1,12 @@
+diff --git a/src/system/persist.h b/src/system/persist.h
+index 4cac399..7fd8461 100644
+--- a/src/system/persist.h
++++ b/src/system/persist.h
+@@ -63,6 +63,7 @@ extern "C" {
+ /* Features (Settings ▸ Features) — opt-in experimental subsystems, off by default. */
+ #define PKEY_LUA_EN         "lua_en"     /* int  0|1      Lua installable-app platform */
+ #define PKEY_ELF_UNSIGNED   "elf_unsig"  /* int  0|1      allow unsigned native ELF apps */
++#define PKEY_TX_EN          "tx_en"      /* int  0|1      allow active 802.11 transmit (deauth) */
+ 
+ /* ELF-loader spike: crash breadcrumb (survives reboot to locate a hard fault). */
+ #define PKEY_ELF_STAGE      "elf_stg"    /* int  last ELF-load step reached           */

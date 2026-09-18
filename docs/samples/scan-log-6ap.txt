@@ -1,0 +1,286 @@
+[pd] scan t=704485 esp_err=0x0000 num=4 src=2 raw=4 ok=4 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -68  auth3   net-04----
+[pd]   02:00:00:00:00:01 ch1    -74  auth3   net-01--------------
+[pd]   00:00:06:00:00:09 ch1    -77  auth4   net-06-----
+[pd]   02:00:1B:00:00:2B ch11   -95  auth4   net-25-----
+[pd] scan t=708651 esp_err=0x0000 num=6 src=2 raw=6 ok=6 hid=0 full=0 tbl=1
+[pd]   00:00:06:00:00:09 ch1    -59  auth4   net-06-----
+[pd]   00:00:03:00:00:06 ch2    -63  auth3   net-04----
+[pd]   02:00:00:00:00:01 ch1    -73  auth3   net-01--------------
+[pd]   02:00:14:00:00:1F ch6    -81  auth0   net-19---------
+[pd]   02:00:1B:00:00:2B ch11   -92  auth4   net-25-----
+[pd]   00:00:1C:00:00:2C ch11   -94  auth3   net-26------------
+[pd] scan t=712653 esp_err=0x0000 num=6 src=2 raw=6 ok=6 hid=0 full=0 tbl=1
+[pd]   00:00:06:00:00:09 ch1    -59  auth4   net-06-----
+[pd]   00:00:03:00:00:06 ch2    -64  auth3   net-04----
+[pd]   02:00:00:00:00:01 ch1    -75  auth3   net-01--------------
+[pd]   02:00:14:00:00:1F ch6    -78  auth0   net-19---------
+[pd]   02:00:1B:00:00:2B ch11   -92  auth4   net-25-----
+[pd]   00:00:1C:00:00:2C ch11   -93  auth3   net-26------------
+[pd] scan t=716654 esp_err=0x0000 num=6 src=2 raw=6 ok=6 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -64  auth3   net-04----
+[pd]   02:00:00:00:00:01 ch1    -68  auth3   net-01--------------
+[pd]   00:00:06:00:00:09 ch1    -69  auth4   net-06-----
+[pd]   02:00:14:00:00:1F ch6    -79  auth0   net-19---------
+[pd]   02:00:1B:00:00:2B ch11   -92  auth4   net-25-----
+[pd]   00:00:1C:00:00:2C ch11   -93  auth3   net-26------------
+[pd] scan t=720655 esp_err=0x0000 num=6 src=2 raw=6 ok=6 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -63  auth3   net-04----
+[pd]   02:00:00:00:00:01 ch1    -67  auth3   net-01--------------
+[pd]   00:00:06:00:00:09 ch1    -74  auth4   net-06-----
+[pd]   02:00:14:00:00:1F ch6    -78  auth0   net-19---------
+[pd]   02:00:1B:00:00:2B ch11   -91  auth4   net-25-----
+[pd]   00:00:1C:00:00:2C ch11   -94  auth3   net-26------------
+[pd] scan t=724665 esp_err=0x0000 num=6 src=2 raw=6 ok=6 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -63  auth3   net-04----
+[pd]   02:00:00:00:00:01 ch1    -70  auth3   net-01--------------
+[pd]   00:00:06:00:00:09 ch1    -76  auth4   net-06-----
+[pd]   02:00:14:00:00:1F ch6    -77  auth0   net-19---------
+[pd]   02:00:1B:00:00:2B ch11   -90  auth4   net-25-----
+[pd]   00:00:1C:00:00:2C ch11   -94  auth3   net-26------------
+[pd] scan t=728474 esp_err=0x0000 num=5 src=2 raw=5 ok=5 hid=0 full=0 tbl=1
+[pd]   02:00:00:00:00:01 ch1    -69  auth3   net-01--------------
+[pd]   02:00:14:00:00:1F ch6    -78  auth0   net-19---------
+[pd]   00:00:06:00:00:09 ch1    -88  auth4   net-06-----
+[pd]   00:00:1C:00:00:2C ch11   -93  auth3   net-26------------
+[pd]   02:00:1B:00:00:2B ch11   -94  auth4   net-25-----
+[pd] scan t=732688 esp_err=0x0000 num=6 src=2 raw=6 ok=6 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -63  auth3   net-04----
+[pd]   02:00:00:00:00:01 ch1    -67  auth3   net-01--------------
+[pd]   00:00:06:00:00:09 ch1    -73  auth4   net-06-----
+[pd]   02:00:14:00:00:1F ch6    -78  auth0   net-19---------
+[pd]   02:00:1B:00:00:2B ch11   -91  auth4   net-25-----
+[pd]   00:00:1C:00:00:2C ch11   -93  auth3   net-26------------
+[pd] scan t=736699 esp_err=0x0000 num=6 src=2 raw=6 ok=6 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -65  auth3   net-04----
+[pd]   02:00:00:00:00:01 ch1    -73  auth3   net-01--------------
+[pd]   00:00:06:00:00:09 ch1    -73  auth4   net-06-----
+[pd]   02:00:14:00:00:1F ch6    -78  auth0   net-19---------
+[pd]   00:00:1C:00:00:2C ch11   -92  auth3   net-26------------
+[pd]   02:00:1B:00:00:2B ch11   -94  auth4   net-25-----
+[pd] scan t=740652 esp_err=0x0000 num=4 src=2 raw=4 ok=4 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -64  auth3   net-04----
+[pd]   02:00:00:00:00:01 ch1    -69  auth3   net-01--------------
+[pd]   00:00:06:00:00:09 ch1    -76  auth4   net-06-----
+[pd]   02:00:14:00:00:1F ch6    -77  auth0   net-19---------
+[pd] scan t=744657 esp_err=0x0000 num=4 src=2 raw=4 ok=4 hid=0 full=0 tbl=1
+[pd]   02:00:00:00:00:01 ch1    -62  auth3   net-01--------------
+[pd]   00:00:06:00:00:09 ch1    -62  auth4   net-06-----
+[pd]   02:00:14:00:00:1F ch6    -70  auth0   net-19---------
+[pd]   00:00:0F:00:00:20 ch9    -96  auth3   net-13-----------
+[pd] scan t=748873 esp_err=0x0000 num=5 src=2 raw=5 ok=5 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -51  auth3   net-04----
+[pd]   00:00:06:00:00:09 ch1    -59  auth4   net-06-----
+[pd]   02:00:14:00:00:1F ch6    -64  auth0   net-19---------
+[pd]   02:00:00:00:00:01 ch1    -66  auth3   net-01--------------
+[pd]   02:00:1B:00:00:2B ch11   -91  auth4   net-25-----
+[pd] scan t=752909 esp_err=0x0000 num=5 src=2 raw=5 ok=5 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -53  auth3   net-04----
+[pd]   00:00:06:00:00:09 ch1    -59  auth4   net-06-----
+[pd]   02:00:14:00:00:1F ch6    -62  auth0   net-19---------
+[pd]   02:00:00:00:00:01 ch1    -67  auth3   net-01--------------
+[pd]   02:00:1B:00:00:2B ch11   -90  auth4   net-25-----
+[pd] scan t=757145 esp_err=0x0000 num=6 src=2 raw=6 ok=6 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -52  auth3   net-04----
+[pd]   00:00:06:00:00:09 ch1    -60  auth4   net-06-----
+[pd]   02:00:14:00:00:1F ch6    -63  auth0   net-19---------
+[pd]   02:00:00:00:00:01 ch1    -69  auth3   net-01--------------
+[pd]   02:00:1B:00:00:2B ch11   -88  auth4   net-25-----
+[pd]   00:00:09:00:00:1E ch8    -92  auth3   net-18----------------
+[pd] scan t=761160 esp_err=0x0000 num=6 src=2 raw=6 ok=6 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -52  auth3   net-04----
+[pd]   00:00:06:00:00:09 ch1    -60  auth4   net-06-----
+[pd]   02:00:14:00:00:1F ch6    -64  auth0   net-19---------
+[pd]   02:00:00:00:00:01 ch1    -66  auth3   net-01--------------
+[pd]   02:00:1B:00:00:2B ch11   -89  auth4   net-25-----
+[pd]   00:00:0F:00:00:20 ch9    -93  auth3   net-13-----------
+[pd] scan t=764966 esp_err=0x0000 num=6 src=2 raw=6 ok=6 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -52  auth3   net-04----
+[pd]   00:00:06:00:00:09 ch1    -59  auth4   net-06-----
+[pd]   02:00:14:00:00:1F ch6    -64  auth0   net-19---------
+[pd]   02:00:00:00:00:01 ch1    -67  auth3   net-01--------------
+[pd]   02:00:1B:00:00:2B ch11   -90  auth4   net-25-----
+[pd]   00:00:1C:00:00:2C ch11   -94  auth3   net-26------------
+[pd] scan t=768973 esp_err=0x0000 num=6 src=2 raw=6 ok=6 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -52  auth3   net-04----
+[pd]   00:00:06:00:00:09 ch1    -60  auth4   net-06-----
+[pd]   02:00:14:00:00:1F ch6    -61  auth0   net-19---------
+[pd]   02:00:00:00:00:01 ch1    -69  auth3   net-01--------------
+[pd]   02:00:1B:00:00:2B ch11   -91  auth4   net-25-----
+[pd]   00:00:1C:00:00:2C ch11   -95  auth3   net-26------------
+[pd] scan t=772980 esp_err=0x0000 num=5 src=2 raw=5 ok=5 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -51  auth3   net-04----
+[pd]   00:00:06:00:00:09 ch1    -58  auth4   net-06-----
+[pd]   02:00:14:00:00:1F ch6    -64  auth0   net-19---------
+[pd]   02:00:00:00:00:01 ch1    -69  auth3   net-01--------------
+[pd]   02:00:1B:00:00:2B ch11   -91  auth4   net-25-----
+[pd] scan t=777216 esp_err=0x0000 num=7 src=2 raw=7 ok=7 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -51  auth3   net-04----
+[pd]   00:00:06:00:00:09 ch1    -59  auth4   net-06-----
+[pd]   02:00:14:00:00:1F ch6    -63  auth0   net-19---------
+[pd]   02:00:00:00:00:01 ch1    -67  auth3   net-01--------------
+[pd]   02:00:1B:00:00:2B ch11   -91  auth4   net-25-----
+[pd]   00:00:1C:00:00:2C ch11   -91  auth3   net-26------------
+[pd]   00:00:09:00:00:1E ch8    -95  auth3   net-18----------------
+[pd] scan t=781022 esp_err=0x0000 num=6 src=2 raw=6 ok=6 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -51  auth3   net-04----
+[pd]   00:00:06:00:00:09 ch1    -58  auth4   net-06-----
+[pd]   02:00:14:00:00:1F ch6    -64  auth0   net-19---------
+[pd]   02:00:00:00:00:01 ch1    -69  auth3   net-01--------------
+[pd]   02:00:1B:00:00:2B ch11   -89  auth4   net-25-----
+[pd]   00:00:1C:00:00:2C ch11   -92  auth3   net-26------------
+[pd] scan t=785057 esp_err=0x0000 num=6 src=2 raw=6 ok=6 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -57  auth3   net-04----
+[pd]   00:00:06:00:00:09 ch1    -59  auth4   net-06-----
+[pd]   02:00:14:00:00:1F ch6    -63  auth0   net-19---------
+[pd]   02:00:00:00:00:01 ch1    -69  auth3   net-01--------------
+[pd]   02:00:1B:00:00:2B ch11   -91  auth4   net-25-----
+[pd]   00:00:1C:00:00:2C ch11   -94  auth3   net-26------------
+[pd] scan t=788882 esp_err=0x0000 num=4 src=2 raw=4 ok=4 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -52  auth3   net-04----
+[pd]   00:00:06:00:00:09 ch1    -61  auth4   net-06-----
+[pd]   02:00:14:00:00:1F ch6    -63  auth0   net-19---------
+[pd]   02:00:00:00:00:01 ch1    -65  auth3   net-01--------------
+[pd] scan t=792900 esp_err=0x0000 num=4 src=2 raw=4 ok=4 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -52  auth3   net-04----
+[pd]   00:00:06:00:00:09 ch1    -58  auth4   net-06-----
+[pd]   02:00:14:00:00:1F ch6    -64  auth0   net-19---------
+[pd]   02:00:00:00:00:01 ch1    -67  auth3   net-01--------------
+[pd] scan t=796916 esp_err=0x0000 num=4 src=2 raw=4 ok=4 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -51  auth3   net-04----
+[pd]   00:00:06:00:00:09 ch1    -61  auth4   net-06-----
+[pd]   02:00:14:00:00:1F ch6    -63  auth0   net-19---------
+[pd]   02:00:00:00:00:01 ch1    -66  auth3   net-01--------------
+[pd] scan t=800921 esp_err=0x0000 num=4 src=2 raw=4 ok=4 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -52  auth3   net-04----
+[pd]   00:00:06:00:00:09 ch1    -59  auth4   net-06-----
+[pd]   02:00:14:00:00:1F ch6    -63  auth0   net-19---------
+[pd]   02:00:00:00:00:01 ch1    -66  auth3   net-01--------------
+[pd] scan t=804937 esp_err=0x0000 num=4 src=2 raw=4 ok=4 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -52  auth3   net-04----
+[pd]   00:00:06:00:00:09 ch1    -57  auth4   net-06-----
+[pd]   02:00:14:00:00:1F ch6    -64  auth0   net-19---------
+[pd]   02:00:00:00:00:01 ch1    -66  auth3   net-01--------------
+[pd] scan t=809142 esp_err=0x0000 num=6 src=2 raw=6 ok=6 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -51  auth3   net-04----
+[pd]   02:00:14:00:00:1F ch6    -62  auth0   net-19---------
+[pd]   02:00:00:00:00:01 ch1    -65  auth3   net-01--------------
+[pd]   00:00:06:00:00:09 ch1    -65  auth4   net-06-----
+[pd]   02:00:1B:00:00:2B ch11   -92  auth4   net-25-----
+[pd]   00:00:1C:00:00:2C ch11   -94  auth3   net-26------------
+[pd] scan t=813178 esp_err=0x0000 num=6 src=2 raw=6 ok=6 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -53  auth3   net-04----
+[pd]   02:00:14:00:00:1F ch6    -63  auth0   net-19---------
+[pd]   02:00:00:00:00:01 ch1    -64  auth3   net-01--------------
+[pd]   00:00:06:00:00:09 ch1    -65  auth4   net-06-----
+[pd]   02:00:1B:00:00:2B ch11   -90  auth4   net-25-----
+[pd]   00:00:1C:00:00:2C ch11   -95  auth3   net-26------------
+[pd] scan t=817213 esp_err=0x0000 num=6 src=2 raw=6 ok=6 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -51  auth3   net-04----
+[pd]   02:00:14:00:00:1F ch6    -63  auth0   net-19---------
+[pd]   02:00:00:00:00:01 ch1    -64  auth3   net-01--------------
+[pd]   00:00:06:00:00:09 ch1    -66  auth4   net-06-----
+[pd]   00:00:1C:00:00:2C ch11   -92  auth3   net-26------------
+[pd]   02:00:1B:00:00:2B ch11   -93  auth4   net-25-----
+[pd] scan t=821249 esp_err=0x0000 num=6 src=2 raw=6 ok=6 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -52  auth3   net-04----
+[pd]   02:00:14:00:00:1F ch6    -62  auth0   net-19---------
+[pd]   00:00:06:00:00:09 ch1    -65  auth4   net-06-----
+[pd]   02:00:00:00:00:01 ch1    -66  auth3   net-01--------------
+[pd]   02:00:1B:00:00:2B ch11   -92  auth4   net-25-----
+[pd]   00:00:1C:00:00:2C ch11   -94  auth3   net-26------------
+[pd] scan t=825084 esp_err=0x0000 num=5 src=2 raw=5 ok=5 hid=0 full=0 tbl=1
+[pd]   02:00:14:00:00:1F ch6    -63  auth0   net-19---------
+[pd]   00:00:06:00:00:09 ch1    -63  auth4   net-06-----
+[pd]   02:00:00:00:00:01 ch1    -66  auth3   net-01--------------
+[pd]   02:00:1B:00:00:2B ch11   -89  auth4   net-25-----
+[pd]   00:00:1C:00:00:2C ch11   -92  auth3   net-26------------
+[pd] scan t=829300 esp_err=0x0000 num=5 src=2 raw=5 ok=5 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -51  auth3   net-04----
+[pd]   02:00:14:00:00:1F ch6    -62  auth0   net-19---------
+[pd]   00:00:06:00:00:09 ch1    -63  auth4   net-06-----
+[pd]   02:00:00:00:00:01 ch1    -67  auth3   net-01--------------
+[pd]   00:00:09:00:00:1E ch8    -93  auth3   net-18----------------
+[pd] scan t=833325 esp_err=0x0000 num=5 src=2 raw=5 ok=5 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -50  auth3   net-04----
+[pd]   00:00:06:00:00:09 ch1    -59  auth4   net-06-----
+[pd]   02:00:14:00:00:1F ch6    -63  auth0   net-19---------
+[pd]   02:00:00:00:00:01 ch1    -69  auth3   net-01--------------
+[pd]   02:00:1B:00:00:2B ch11   -88  auth4   net-25-----
+[pd] scan t=837360 esp_err=0x0000 num=6 src=2 raw=6 ok=6 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -53  auth3   net-04----
+[pd]   00:00:06:00:00:09 ch1    -62  auth4   net-06-----
+[pd]   02:00:14:00:00:1F ch6    -63  auth0   net-19---------
+[pd]   02:00:00:00:00:01 ch1    -67  auth3   net-01--------------
+[pd]   02:00:1B:00:00:2B ch11   -88  auth4   net-25-----
+[pd]   00:00:1C:00:00:2C ch11   -96  auth3   net-26------------
+[pd] scan t=841396 esp_err=0x0000 num=5 src=2 raw=5 ok=5 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -51  auth3   net-04----
+[pd]   00:00:06:00:00:09 ch1    -62  auth4   net-06-----
+[pd]   02:00:14:00:00:1F ch6    -63  auth0   net-19---------
+[pd]   02:00:00:00:00:01 ch1    -70  auth3   net-01--------------
+[pd]   02:00:1B:00:00:2B ch11   -90  auth4   net-25-----
+[pd] scan t=845203 esp_err=0x0000 num=4 src=2 raw=4 ok=4 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -52  auth3   net-04----
+[pd]   00:00:06:00:00:09 ch1    -61  auth4   net-06-----
+[pd]   02:00:14:00:00:1F ch6    -63  auth0   net-19---------
+[pd]   02:00:00:00:00:01 ch1    -68  auth3   net-01--------------
+[pd] scan t=849209 esp_err=0x0000 num=4 src=2 raw=4 ok=4 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -51  auth3   net-04----
+[pd]   00:00:06:00:00:09 ch1    -61  auth4   net-06-----
+[pd]   02:00:14:00:00:1F ch6    -63  auth0   net-19---------
+[pd]   02:00:00:00:00:01 ch1    -66  auth3   net-01--------------
+[pd] scan t=853425 esp_err=0x0000 num=5 src=2 raw=5 ok=5 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -52  auth3   net-04----
+[pd]   00:00:06:00:00:09 ch1    -61  auth4   net-06-----
+[pd]   02:00:14:00:00:1F ch6    -63  auth0   net-19---------
+[pd]   02:00:00:00:00:01 ch1    -68  auth3   net-01--------------
+[pd]   02:00:1B:00:00:2B ch11   -89  auth4   net-25-----
+[pd] scan t=857432 esp_err=0x0000 num=5 src=2 raw=5 ok=5 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -50  auth3   net-04----
+[pd]   00:00:06:00:00:09 ch1    -60  auth4   net-06-----
+[pd]   02:00:14:00:00:1F ch6    -64  auth0   net-19---------
+[pd]   02:00:00:00:00:01 ch1    -65  auth3   net-01--------------
+[pd]   02:00:1B:00:00:2B ch11   -88  auth4   net-25-----
+[pd] scan t=861455 esp_err=0x0000 num=5 src=2 raw=5 ok=5 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -51  auth3   net-04----
+[pd]   00:00:06:00:00:09 ch1    -58  auth4   net-06-----
+[pd]   02:00:00:00:00:01 ch1    -63  auth3   net-01--------------
+[pd]   02:00:14:00:00:1F ch6    -64  auth0   net-19---------
+[pd]   02:00:1B:00:00:2B ch11   -88  auth4   net-25-----
+[pd] scan t=865490 esp_err=0x0000 num=5 src=2 raw=5 ok=5 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -50  auth3   net-04----
+[pd]   00:00:06:00:00:09 ch1    -59  auth4   net-06-----
+[pd]   02:00:00:00:00:01 ch1    -61  auth3   net-01--------------
+[pd]   02:00:14:00:00:1F ch6    -63  auth0   net-19---------
+[pd]   02:00:1B:00:00:2B ch11   -87  auth4   net-25-----
+[pd] scan t=869525 esp_err=0x0000 num=6 src=2 raw=6 ok=6 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -51  auth3   net-04----
+[pd]   00:00:06:00:00:09 ch1    -59  auth4   net-06-----
+[pd]   02:00:14:00:00:1F ch6    -64  auth0   net-19---------
+[pd]   02:00:00:00:00:01 ch1    -65  auth3   net-01--------------
+[pd]   02:00:1B:00:00:2B ch11   -88  auth4   net-25-----
+[pd]   00:00:1C:00:00:2C ch11   -95  auth3   net-26------------
+[pd] scan t=873540 esp_err=0x0000 num=5 src=2 raw=5 ok=5 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -51  auth3   net-04----
+[pd]   00:00:06:00:00:09 ch1    -59  auth4   net-06-----
+[pd]   02:00:14:00:00:1F ch6    -63  auth0   net-19---------
+[pd]   02:00:00:00:00:01 ch1    -66  auth3   net-01--------------
+[pd]   02:00:1B:00:00:2B ch11   -90  auth4   net-25-----
+[pd] scan t=877586 esp_err=0x0000 num=5 src=2 raw=5 ok=5 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -53  auth3   net-04----
+[pd]   02:00:14:00:00:1F ch6    -62  auth0   net-19---------
+[pd]   02:00:00:00:00:01 ch1    -62  auth3   net-01--------------
+[pd]   00:00:06:00:00:09 ch1    -63  auth4   net-06-----
+[pd]   02:00:1B:00:00:2B ch11   -90  auth4   net-25-----
+[pd] scan t=881595 esp_err=0x0000 num=5 src=2 raw=5 ok=5 hid=0 full=0 tbl=1
+[pd]   00:00:03:00:00:06 ch2    -61  auth3   net-04----
+[pd]   02:00:00:00:00:01 ch1    -65  auth3   net-01--------------
+[pd]   00:00:06:00:00:09 ch1    -67  auth4   net-06-----
+[pd]   02:00:14:00:00:1F ch6    -82  auth0   net-19---------
+[pd]   00:00:1C:00:00:2C ch11   -94  auth3   net-26------------
+[pd] scan t=885399 esp_err=0x0000 num=4 src=2 raw=4 ok=4 hid=0 full=0 tbl=1
+[pd]   00:00:06:00:00:09 ch1    -65  auth4   net-06-----
+[pd]   00:00:03:00:00:06 ch2    -66  auth3   net-04----
+[pd]   02:00:00:00:00:01 ch1    -69  auth3   net-01--------------
+[pd]   02:00:14:00:00:1F ch6    -81  auth0   net-19---------

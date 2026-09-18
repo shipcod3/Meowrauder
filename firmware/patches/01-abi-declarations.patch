@@ -1,0 +1,450 @@
+diff --git a/src/system/mk_app_abi.h b/src/system/mk_app_abi.h
+index a681744..3f450b5 100644
+--- a/src/system/mk_app_abi.h
++++ b/src/system/mk_app_abi.h
+@@ -20,6 +20,21 @@
+ extern "C" {
+ #endif
+ 
++/* ── ABI version ─────────────────────────────────────────────────────────
++ * Apps are ELF files loaded from the SD card, so the app and the firmware are
++ * updated independently. Any change to a struct in this header silently
++ * shifts field offsets for an app built against a different revision, and the
++ * symptom is not a crash — it is a screen quietly reading the wrong bytes and
++ * a control that appears to do nothing.
++ *
++ * Bump this on ANY change to a struct layout or an enum value here. An app
++ * should compare mk_abi_version() against the MK_ABI_VERSION it compiled with
++ * and refuse to run on a mismatch, which turns a baffling misbehaviour into
++ * one clear message. */
++#define MK_ABI_VERSION 4
++
++uint32_t mk_abi_version(void);
++
+ /* ── Colors (0xRRGGBB) ─────────────────────────────────────────────────── */
+ #define MK_COL_BLACK   0x000000u
+ #define MK_COL_WHITE   0xFFFFFFu
+@@ -255,6 +270,423 @@ int  mk_tracker_list(mk_tracker_t* out, int max);      /* up to MK_TRK_MAXTRK */
+ int  mk_tracker_select(uint32_t id);                   /* 0 releases; 1 if present */
+ void mk_tracker_finder(mk_tracker_finder_t* out);      /* finder state for selection */
+ 
++/* ── WiFi Fox Hunt — follow one 802.11 target by signal ───────────────────
++ * Builds a target list from beacons/probe-responses (APs, with SSID) and
++ * data/probe-request frames (stations), then follows one selected target.
++ * The finder state reuses mk_tracker_finder_t: identical semantics to the BLE
++ * tracker radar, so both radios behave the same. Receive-only. */
++#define MK_FOX_MAX 32
++enum { MK_FOX_AP = 0, MK_FOX_STA = 1 };
++
++typedef struct {
++    uint8_t  mac[6];
++    char     ssid[33];       /* APs only; "" for stations */
++    uint8_t  kind;           /* MK_FOX_* */
++    uint8_t  channel;
++    int8_t   rssi;
++    int16_t  filtered_rssi;  /* median + EWMA, dBm */
++    uint16_t count;
++    uint32_t id;             /* stable within a session */
++} mk_fox_target_t;
++
++typedef struct {
++    uint16_t targets;
++    uint16_t aps;
++    uint16_t stations;
++    uint8_t  channel;
++    uint8_t  hopping;   /* 0/1 */
++    uint8_t  running;   /* 0/1 */
++} mk_fox_stats_t;
++
++void mk_fox_begin(void);
++void mk_fox_loop(void);
++void mk_fox_pause(void);
++void mk_fox_resume(void);
++void mk_fox_stop(void);
++int  mk_fox_running(void);
++void mk_fox_stats(mk_fox_stats_t* out);
++int  mk_fox_list(mk_fox_target_t* out, int max);   /* strongest first */
++int  mk_fox_select(uint32_t id);                   /* 0 releases; 1 if present */
++void mk_fox_finder(mk_tracker_finder_t* out);
++void mk_fox_set_channel(int channel);              /* 0 = resume hopping */
++
++/* ── WPA/WPA2 EAPOL + PMKID capture ──────────────────────────────────────
++ * Records EAPOL-Key frames to /pcap/eapol_NNN.pcap and appends any PMKID to
++ * /pcap/pmkid.22000 (hashcat WPA*01). For auditing passphrase strength on
++ * networks you may test. Receive-only — it cannot force a handshake. */
++#define MK_EAPOL_MAX 16
++#define MK_EAPOL_M1          1
++#define MK_EAPOL_M2          2
++#define MK_EAPOL_M3          4
++#define MK_EAPOL_M4          8
++#define MK_EAPOL_SAE_COMMIT  16   /* WPA3 SAE commit  (auth alg 3, seq 1) */
++#define MK_EAPOL_SAE_CONFIRM 32   /* WPA3 SAE confirm (auth alg 3, seq 2) */
++
++/* Why a start attempt failed, so the UI can say something specific. */
++enum { MK_EAPOL_ERR_NONE = 0, MK_EAPOL_ERR_MEM, MK_EAPOL_ERR_DIR,
++       MK_EAPOL_ERR_FULL, MK_EAPOL_ERR_OPEN, MK_EAPOL_ERR_WRITE,
++       MK_EAPOL_ERR_PROMISC };
++
++typedef struct {
++    uint8_t  bssid[6];
++    uint8_t  sta[6];
++    uint8_t  msgs;         /* MK_EAPOL_M* bitmask */
++    uint8_t  have_pmkid;   /* 0/1 */
++    uint8_t  pmkid[16];
++    int8_t   rssi;
++    uint8_t  channel;
++} mk_eapol_target_t;
++
++typedef struct {
++    uint32_t frames;
++    uint16_t targets;
++    uint16_t pmkids;
++    uint16_t handshakes;   /* pairs with at least M1+M2 */
++    uint16_t sae;          /* pairs with SAE commit+confirm */
++    uint16_t dropped;
++    uint8_t  channel;
++    uint8_t  hopping;      /* 0/1 */
++    uint8_t  running;      /* 0/1 */
++    uint8_t  error;        /* MK_EAPOL_ERR_* — last begin() failure */
++    char     path[40];
++} mk_eapol_stats_t;
++
++int  mk_eapol_begin(int hop, int channel);
++void mk_eapol_loop(void);
++void mk_eapol_pause(void);
++void mk_eapol_resume(void);
++void mk_eapol_stop(void);
++int  mk_eapol_running(void);
++void mk_eapol_stats(mk_eapol_stats_t* out);
++int  mk_eapol_list(mk_eapol_target_t* out, int max);   /* newest first */
++void mk_eapol_set_channel(int channel);
++
++/* ── Evil-twin / captive-portal detection ────────────────────────────────
++ * Passive half: repeated scans grouped by SSID, flagging the patterns a
++ * legitimate multi-AP deployment does not produce. Active half (opt-in, one
++ * network at a time): joins a chosen OPEN network and fetches a known-204
++ * endpoint over cleartext — the same connectivity check every phone performs —
++ * so an intercepting portal shows up as a redirect or a page body.
++ * Finds portals; does not create them. */
++#define MK_PD_MAX  24
++#define MK_PD_PER  4
++
++#define MK_PD_OPEN_CLONE     (1u << 0)   /* SSID offered open AND secured    */
++#define MK_PD_MULTI_OUI      (1u << 1)   /* BSSIDs from unrelated vendors    */
++#define MK_PD_AUTH_DOWNGRADE (1u << 2)   /* security weaker than first seen  */
++#define MK_PD_MULTI_CHANNEL  (1u << 3)   /* widely separated channels (info) */
++#define MK_PD_SIGNAL_JUMP    (1u << 4)   /* open clone as loud as the real AP*/
++
++enum { MK_PD_PROBE_IDLE = 0, MK_PD_PROBE_CONNECTING, MK_PD_PROBE_CHECKING,
++       MK_PD_PROBE_DONE, MK_PD_PROBE_FAILED };
++enum { MK_PD_VERDICT_NONE = 0, MK_PD_VERDICT_CLEAR, MK_PD_VERDICT_PORTAL,
++       MK_PD_VERDICT_INTERCEPT, MK_PD_VERDICT_NONET };
++
++typedef struct {
++    uint8_t bssid[6];
++    uint8_t channel;
++    int8_t  rssi;
++    uint8_t auth;            /* same encoding as mk_ap_t.auth */
++} mk_pd_bssid_t;
++
++typedef struct {
++    char          ssid[33];
++    uint8_t       n_bssid;
++    uint16_t      flags;     /* MK_PD_* */
++    int8_t        best_rssi;
++    uint8_t       first_auth;
++    mk_pd_bssid_t ap[MK_PD_PER];
++} mk_pd_ssid_t;
++
++typedef struct {
++    uint16_t ssids;
++    uint16_t flagged;
++    uint16_t scans;
++    uint8_t  scanning;   /* 0/1 */
++    uint8_t  running;    /* 0/1 */
++
++    /* Why a scan produced nothing. Zero SSIDs can mean the scan never
++     * started (scan_rc != -1), started and failed (complete_rc < 0), or
++     * succeeded and was dropped by the table (raw_seen > 0, accepted 0). */
++    int16_t  scan_rc;
++    int16_t  complete_rc;
++    uint16_t raw_seen;
++    uint16_t accepted;
++    uint16_t rej_hidden;
++    uint16_t rej_full;
++    uint16_t rej_bssid;
++    uint8_t  table_ok;   /* 0/1 */
++} mk_pd_stats_t;
++
++/* Rogue evidence. A portal verdict says what the network does; these say
++ * whether it looks hostile. Every venue portal in the world is a portal. */
++#define MK_PD_RG_SOFTAP_GW    (1u << 0)  /* gateway is 192.168.4.1          */
++#define MK_PD_RG_IP_REDIRECT  (1u << 1)  /* redirected to a bare IP         */
++#define MK_PD_RG_DNS_WILDCARD (1u << 2)  /* invented hostname resolves      */
++#define MK_PD_RG_NO_SERVER    (1u << 3)  /* no Server: header               */
++#define MK_PD_RG_FAST_LOCAL   (1u << 4)  /* answered too fast to be upstream*/
++#define MK_PD_RG_OPEN_CLONE   (1u << 5)  /* SSID also exists secured        */
++#define MK_PD_RG_SIGNAL_JUMP  (1u << 6)  /* clone louder than the real AP   */
++#define MK_PD_RG_MULTI_OUI    (1u << 7)  /* same SSID across vendor OUIs    */
++
++typedef struct {
++    char     ssid[33];
++    uint8_t  state;          /* MK_PD_PROBE_*   */
++    uint8_t  verdict;        /* MK_PD_VERDICT_* */
++    int16_t  http_code;
++    char     redirect[64];
++    uint32_t elapsed_ms;
++
++    uint16_t rogue_flags;    /* MK_PD_RG_*      */
++    uint8_t  rogue_conf;     /* 0-100           */
++    char     gateway[16];
++    char     server[24];
++    uint16_t rtt_ms;
++} mk_pd_probe_t;
++
++void mk_pd_begin(void);
++void mk_pd_loop(void);
++void mk_pd_stop(void);
++int  mk_pd_running(void);
++void mk_pd_stats(mk_pd_stats_t* out);
++int  mk_pd_list(mk_pd_ssid_t* out, int max);   /* flagged first, then strongest */
++
++/* Open networks only; never sends a passphrase. 1 = probe started. */
++int  mk_pd_probe_begin(const char* ssid);
++void mk_pd_probe_stop(void);
++void mk_pd_probe(mk_pd_probe_t* out);
++
++/* ── Rogue-tool detection ────────────────────────────────────────────────
++ * Finds other people's hacking hardware nearby — Flipper Zero, Pwnagotchi,
++ * WiFi Pineapple, deauthers, and ESP32 tool firmwares (Bruce, Marauder).
++ * Passive on both radios; WiFi and BLE are separate modes because the radios
++ * contend.
++ *
++ * Hits carry their evidence, not just a verdict. An Espressif OUI proves
++ * nothing alone — every ESP32 shares those prefixes, this device included — so
++ * it only ever corroborates. Behaviour is the strong signal: one BSSID
++ * advertising many SSIDs is Karma, and a station emitting deauth is attacking
++ * whatever it calls itself. OUI or beaconing alone never raises a hit. */
++#define MK_TD_MAX 24
++
++enum { MK_TD_UNKNOWN = 0, MK_TD_PINEAPPLE, MK_TD_PWNAGOTCHI, MK_TD_DEAUTHER,
++       MK_TD_MARAUDER, MK_TD_BRUCE, MK_TD_FLIPPER, MK_TD_ESP_TOOL };
++
++#define MK_TD_EV_NAME      (1u << 0)
++#define MK_TD_EV_OUI       (1u << 1)
++#define MK_TD_EV_MULTISSID (1u << 2)
++#define MK_TD_EV_DEAUTH_TX (1u << 3)
++#define MK_TD_EV_BEACON_TX (1u << 4)
++#define MK_TD_EV_JSON_SSID (1u << 5)
++#define MK_TD_EV_SVC_UUID  (1u << 6)
++#define MK_TD_EV_MFG       (1u << 7)
++#define MK_TD_EV_SOFTAP    (1u << 8)   /* open net + non-ascending rates */
++
++enum { MK_TD_MODE_WIFI = 0, MK_TD_MODE_BLE = 1 };
++
++typedef struct {
++    uint8_t  mac[6];
++    uint8_t  kind;         /* MK_TD_* */
++    uint8_t  radio;        /* MK_TD_MODE_* */
++    uint8_t  confidence;   /* 0..100 */
++    int8_t   rssi;
++    uint8_t  channel;
++    char     label[33];    /* SSID or BLE name */
++    uint16_t ssid_count;
++    uint16_t count;
++    uint16_t ad_mask;      /* BLE: AD types seen (bit0 flags, 1 uuid16,
++                            * 3 uuid128, 4 name, 8 mfg, 15 other)        */
++    uint16_t mfg_id;       /* BLE: manufacturer company id, 0 if none    */
++    uint16_t uuid16;       /* BLE: first 16-bit service UUID, 0 if none  */
++    uint32_t evidence;     /* MK_TD_EV_* */
++    uint32_t first_ms;
++    uint32_t last_ms;
++} mk_td_hit_t;
++
++typedef struct {
++    uint16_t hits;
++    uint16_t high_conf;    /* confidence >= 70 */
++    uint16_t tracked;
++    uint8_t  mode;
++    uint8_t  channel;
++    uint8_t  hopping;      /* 0/1 */
++    uint8_t  running;      /* 0/1 */
++    uint8_t  ble_error;    /* 0/1 */
++} mk_td_stats_t;
++
++int  mk_td_begin(int mode);     /* MK_TD_MODE_*; 1 = started */
++void mk_td_loop(void);
++void mk_td_stop(void);
++int  mk_td_running(void);
++void mk_td_stats(mk_td_stats_t* out);
++int  mk_td_list(mk_td_hit_t* out, int max);   /* highest confidence first */
++void mk_td_set_channel(int channel);          /* 0 = resume hopping */
++
++/* ── Crash breadcrumbs ───────────────────────────────────────────────────
++ *
++ * The last breadcrumb set before the device went down, kept in RTC RAM so it
++ * survives a panic reboot, plus why it reset. Lets an app show where the
++ * previous run died without a serial console attached. */
++unsigned    mk_crumb_last_id(void);
++const char* mk_crumb_last_name(void);
++unsigned    mk_crumb_reset_id(void);
++const char* mk_crumb_reset_str(void);
++
++/* ── Per-AP security audit from beacon IEs ───────────────────────────────
++ * Parses the RSN, WPA1 and WPS elements the scan API throws away, and reports
++ * assessment findings: WPS left unlocked, PMF not required (so management
++ * frames are unprotected), WPA3 running in downgradable transition mode, TKIP
++ * or WEP still enabled, hidden SSIDs. Entirely passive. */
++#define MK_WA_MAX 32
++
++#define MK_WA_OPEN            (1u << 0)
++#define MK_WA_WEP             (1u << 1)
++#define MK_WA_WPA1            (1u << 2)
++#define MK_WA_TKIP            (1u << 3)
++#define MK_WA_WPS_ENABLED     (1u << 4)
++#define MK_WA_WPS_UNLOCKED    (1u << 5)
++#define MK_WA_NO_PMF          (1u << 6)
++#define MK_WA_PMF_OPTIONAL    (1u << 7)
++#define MK_WA_WPA3_TRANSITION (1u << 8)
++#define MK_WA_HIDDEN          (1u << 9)
++#define MK_WA_OWE             (1u << 10)
++#define MK_WA_PMF_REQUIRED    (1u << 11)
++#define MK_WA_SAE             (1u << 12)
++#define MK_WA_HIDDEN_RESOLVED (1u << 13)
++#define MK_WA_SOFTAP_RATES (1u << 14)  /* ESP-IDF SoftAP rate ordering */
++
++/* Notable beacon IEs — an AP's radio-stack fingerprint. A bare ESP32 SoftAP
++ * (what an evil portal or a hobby tool runs) advertises far fewer of these
++ * than a commercial router. Reported, not judged. */
++#define MK_WA_IE_COUNTRY (1u << 0)
++#define MK_WA_IE_HT      (1u << 1)
++#define MK_WA_IE_HTOP    (1u << 2)
++#define MK_WA_IE_VHT     (1u << 3)
++#define MK_WA_IE_EXTCAP  (1u << 4)
++#define MK_WA_IE_RM      (1u << 5)
++#define MK_WA_IE_POWER   (1u << 6)
++#define MK_WA_IE_WMM     (1u << 7)
++#define MK_WA_IE_WPS     (1u << 8)
++#define MK_WA_IE_MOBDOM  (1u << 9)
++
++typedef struct {
++    uint8_t  bssid[6];
++    char     ssid[33];
++    uint8_t  channel;
++    int8_t   rssi;
++    uint32_t flags;        /* MK_WA_* */
++    uint16_t pairwise;
++    uint16_t group;
++    uint32_t akm;
++    uint8_t  wps_state;    /* 0 none, 1 unconfigured, 2 configured */
++    uint8_t  wps_locked;   /* 0 no, 1 yes, 0xFF unknown */
++    uint8_t  findings;     /* count of serious flags */
++    uint8_t  ie_count;     /* information elements in the beacon */
++    uint8_t  ie_vendor;    /* how many were vendor-specific      */
++    uint16_t ie_mask;      /* MK_WA_IE_* present                 */
++} mk_wa_ap_t;
++
++typedef struct {
++    uint16_t aps;
++    uint16_t at_risk;
++    uint16_t wps_open;
++    uint16_t no_pmf;
++    uint8_t  channel;
++    uint8_t  hopping;   /* 0/1 */
++    uint8_t  running;   /* 0/1 */
++} mk_wa_stats_t;
++
++void mk_wa_begin(void);
++void mk_wa_loop(void);
++void mk_wa_pause(void);
++void mk_wa_resume(void);
++void mk_wa_stop(void);
++int  mk_wa_running(void);
++void mk_wa_stats(mk_wa_stats_t* out);
++int  mk_wa_list(mk_wa_ap_t* out, int max);     /* worst findings first */
++void mk_wa_set_channel(int channel);           /* 0 = resume hopping */
++
++/* ── Evil twin + captive portal (ACTIVE: brings up an AP) ────────────────
++ * Advertises an OPEN SoftAP under the given SSID, hijacks DNS, and serves a
++ * portal page from /portal/<name>.html. Associations and form submissions are
++ * logged to /portal/captures.csv.
++ *
++ * This impersonates a network and records what people type into it. Run it
++ * only under an engagement whose scope covers social-engineering testing of
++ * the site and population being tested. The capture file is plaintext client
++ * credential material — handle and destroy it accordingly. */
++#define MK_TWIN_CLIENTS 16
++#define MK_TWIN_CAPS    16
++
++typedef struct {
++    uint8_t  mac[6];
++    uint32_t joined_ms;
++    uint8_t  submitted;   /* 0/1 */
++} mk_twin_client_t;
++
++typedef struct {
++    uint8_t  mac[6];
++    uint32_t ms;
++    char     field1[48];
++    char     field2[48];
++} mk_twin_cap_t;
++
++typedef struct {
++    char     ssid[33];
++    char     portal[32];
++    uint16_t clients;
++    uint16_t seen;
++    uint16_t submits;
++    uint32_t requests;
++    uint8_t  channel;
++    uint8_t  running;   /* 0/1 */
++    uint8_t  sd_ok;     /* 0/1 — capture log writable */
++} mk_twin_stats_t;
++
++/* portal may be NULL/"" to use the built-in page. 1 = the AP came up. */
++int  mk_twin_begin(const char* ssid, const char* portal, int channel);
++void mk_twin_loop(void);           /* services DNS + HTTP — call every loop */
++void mk_twin_stop(void);
++int  mk_twin_running(void);
++void mk_twin_stats(mk_twin_stats_t* out);
++int  mk_twin_clients(mk_twin_client_t* out, int max);
++int  mk_twin_captures(mk_twin_cap_t* out, int max);   /* newest first */
++void mk_twin_clear(void);
++
++/* ── Raw 802.11 capture to SD (PCAP) ──────────────────────────────────────
++ * A firmware-owned capture service. Promiscuous RX buffers frames in PSRAM and
++ * the drain to /pcap/cap_NNN.pcap happens in mk_pcap_loop(), so the app must
++ * call that regularly or frames are dropped. Frames carry a minimal radiotap
++ * header (channel + RSSI), so Wireshark shows per-frame signal.
++ * Receive-only: nothing here transmits. */
++#define MK_PCAP_HIST 30
++
++typedef struct {
++    uint32_t frames;     /* frames written to the file            */
++    uint32_t dropped;    /* frames lost because the ring was full */
++    uint32_t bytes;      /* file size so far                      */
++    uint16_t rate;       /* frames in the last completed second   */
++    uint16_t peak;
++    uint8_t  channel;
++    uint8_t  hopping;    /* 0/1 — sweeping channels 1..13         */
++    uint8_t  running;    /* 0/1                                   */
++    uint8_t  pinned;     /* 0/1 — hops ignored; something else     */
++                         /*       owns the radio (e.g. a SoftAP)   */
++    uint32_t uptime_s;
++    char     path[40];   /* e.g. "/pcap/cap_007.pcap"             */
++} mk_pcap_stats_t;
++
++/* hop = sweep 1..13; channel = fixed channel when hop is 0. 1 = started. */
++int  mk_pcap_begin(int hop, int channel);
++void mk_pcap_loop(void);              /* drains the ring — call every loop */
++void mk_pcap_pause(void);
++void mk_pcap_resume(void);
++void mk_pcap_stop(void);              /* flush + close the file */
++int  mk_pcap_running(void);
++void mk_pcap_stats(mk_pcap_stats_t* out);
++int  mk_pcap_history(uint16_t* out, int max);   /* up to MK_PCAP_HIST */
++void mk_pcap_set_channel(int channel);          /* 0 = resume hopping */
++
+ /* ── Media / audio player (MeowPlayer) ─────────────────────────────────────
+  * The audio engine (ES8311 DAC + Helix MP3 decoder + I2S on a core-0 worker)
+  * stays in firmware; the app drives it with commands and polls a status

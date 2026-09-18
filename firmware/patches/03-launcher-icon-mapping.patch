@@ -1,0 +1,20 @@
+diff --git a/src/app/app.h b/src/app/app.h
+index da083b4..7e6b421 100644
+--- a/src/app/app.h
++++ b/src/app/app.h
+@@ -40,6 +40,7 @@ extern "C" const lv_img_dsc_t ui_img_usb_msc_png;
+ /* FeralCat app icons (docs/branding → src/ui/images/ui_img_ic_*.c). */
+ extern "C" const lv_img_dsc_t ui_img_ic_meowgotchi;
+ extern "C" const lv_img_dsc_t ui_img_ic_wifianalyzer;
++extern "C" const lv_img_dsc_t ui_img_ic_meowrauder;
+ extern "C" const lv_img_dsc_t ui_img_ic_deauth;
+ extern "C" const lv_img_dsc_t ui_img_ic_rogueradar;
+ extern "C" const lv_img_dsc_t ui_img_ic_blespam;
+@@ -105,6 +106,7 @@ inline const void* native_icon_by_name(const char* name)
+     if (name && name[0]) {
+         /* FeralCat per-app icons */
+         if (!strcmp(name, "wifianalyzer")) return &ui_img_ic_wifianalyzer;
++        if (!strcmp(name, "meowrauder"))   return &ui_img_ic_meowrauder;
+         if (!strcmp(name, "deauth"))       return &ui_img_ic_deauth;
+         if (!strcmp(name, "rogueradar"))   return &ui_img_ic_rogueradar;
+         if (!strcmp(name, "blespam"))      return &ui_img_ic_blespam;

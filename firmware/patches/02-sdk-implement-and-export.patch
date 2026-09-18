@@ -1,0 +1,517 @@
+diff --git a/src/system/app_sdk.cpp b/src/system/app_sdk.cpp
+index 0490dcf..f4b8e30 100644
+--- a/src/system/app_sdk.cpp
++++ b/src/system/app_sdk.cpp
+@@ -8,6 +8,7 @@
+ #include <cstdarg>
+ #include <cstdio>
+ #include <cstring>
++#include "mk_psram_buf.h"
+ #include <LovyanGFX.hpp>
+ #include "../bsp/devices.h"
+ #include "../bsp/wifi/WiFi_Class.hpp"
+@@ -16,6 +17,14 @@
+ #include "beacon_flood.h"
+ #include "ble_spam_monitor.h"
+ #include "probe_monitor.h"
++#include "pcap_capture.h"
++#include "wifi_fox.h"
++#include "eapol_capture.h"
++#include "portal_detect.h"
++#include "wifi_audit.h"
++#include "evil_twin.h"
++#include "tool_detect.h"
++#include "mk_crumb.h"
+ #include "tracker_monitor.h"
+ #include "tracker_finder.h"
+ #include "media/audio_service.h"     /* MeowPlayer audio engine */
+@@ -36,6 +45,13 @@ static DeauthMonitor  s_deauth;
+ static BeaconFlood    s_flood;
+ static BleSpamMonitor s_blespam;
+ static ProbeMonitor   s_probe;
++static PcapCapture    s_pcap;
++static WifiFox        s_fox;
++static EapolCapture   s_eapol;
++static PortalDetect   s_pd;
++static WifiAudit      s_wa;
++static EvilTwin       s_twin;
++static ToolDetect     s_td;
+ static TrackerMonitor s_tracker;
+ static TrackerFinder  s_trkfinder;
+ static uint32_t       s_trk_sel = 0;   /* selected candidate id (0 = none) */
+@@ -540,7 +556,402 @@ int mk_snprintf(char* buf, size_t n, const char* fmt, ...)
+ } /* extern "C" */
+ 
+ /* ── Exported symbol table (name → function) ────────────────────────────── */
++/* ── Raw 802.11 capture to SD (PCAP) ─────────────────────────────────── */
++int  mk_pcap_begin(int hop, int channel)
++{
++    return s_pcap.begin(hop != 0, (uint8_t)channel) ? 1 : 0;
++}
++void mk_pcap_loop(void)   { s_pcap.loop(); }
++void mk_pcap_pause(void)  { s_pcap.pause(); }
++void mk_pcap_resume(void) { s_pcap.resume(); }
++void mk_pcap_stop(void)   { s_pcap.stop(); }
++int  mk_pcap_running(void){ return s_pcap.running() ? 1 : 0; }
++
++void mk_pcap_stats(mk_pcap_stats_t* out)
++{
++    if (!out) return;
++    const PcapStats& st = s_pcap.stats();
++    out->frames   = st.frames;
++    out->dropped  = st.dropped;
++    out->bytes    = st.bytes;
++    out->rate     = st.rate;
++    out->peak     = st.peak;
++    out->channel  = st.channel;
++    out->hopping  = st.hopping ? 1 : 0;
++    out->running  = st.running ? 1 : 0;
++    out->pinned   = st.pinned ? 1 : 0;
++    out->uptime_s = s_pcap.uptime_s();
++    snprintf(out->path, sizeof(out->path), "%s", st.path);
++}
++
++int mk_pcap_history(uint16_t* out, int max)
++{
++    if (!out || max <= 0) return 0;
++    uint16_t tmp[PcapCapture::HIST];
++    s_pcap.history(tmp);
++    int n = max < PcapCapture::HIST ? max : PcapCapture::HIST;
++    memcpy(out, tmp, (size_t)n * sizeof(uint16_t));
++    return n;
++}
++
++void mk_pcap_set_channel(int channel) { s_pcap.set_channel((uint8_t)channel); }
++
++/* ── WiFi Fox Hunt ───────────────────────────────────────────────────── */
++void mk_fox_begin(void)  { s_fox.begin(); }
++void mk_fox_loop(void)   { s_fox.loop(); }
++void mk_fox_pause(void)  { s_fox.pause(); }
++void mk_fox_resume(void) { s_fox.resume(); }
++void mk_fox_stop(void)   { s_fox.stop(); }
++int  mk_fox_running(void){ return s_fox.running() ? 1 : 0; }
++
++void mk_fox_stats(mk_fox_stats_t* out)
++{
++    if (!out) return;
++    const FoxStats& st = s_fox.stats();
++    out->targets  = st.targets;
++    out->aps      = st.aps;
++    out->stations = st.stations;
++    out->channel  = st.channel;
++    out->hopping  = st.hopping ? 1 : 0;
++    out->running  = st.running ? 1 : 0;
++}
++
++int mk_fox_list(mk_fox_target_t* out, int max)
++{
++    if (!out || max <= 0) return 0;
++    static void* s_fox_buf = nullptr;
++    FoxTarget* tmp = (FoxTarget*)mk_psram_buf(&s_fox_buf, sizeof(FoxTarget) * (WifiFox::MAX_TARGETS));
++    if (!tmp) return 0;
++    int n = s_fox.list(tmp, max < WifiFox::MAX_TARGETS ? max : WifiFox::MAX_TARGETS);
++    for (int i = 0; i < n; i++) {
++        memcpy(out[i].mac, tmp[i].mac, 6);
++        snprintf(out[i].ssid, sizeof(out[i].ssid), "%s", tmp[i].ssid);
++        out[i].kind          = tmp[i].kind;
++        out[i].channel       = tmp[i].channel;
++        out[i].rssi          = tmp[i].rssi;
++        out[i].filtered_rssi = tmp[i].filtered_rssi;
++        out[i].count         = tmp[i].count;
++        out[i].id            = tmp[i].id;
++    }
++    return n;
++}
++
++int mk_fox_select(uint32_t id) { return s_fox.select(id); }
++
++void mk_fox_finder(mk_tracker_finder_t* out)
++{
++    if (!out) return;
++    memset(out, 0, sizeof(*out));
++    const TrackerFinder& f = s_fox.finder();
++    FoxTarget t{};
++    if (!f.hasTarget() || !s_fox.finder_target(t)) return;
++
++    const uint32_t now = millis();
++    const bool run = s_fox.running();
++    out->has_target = 1;
++    switch (f.state(now, run)) {
++        case TrackerFinder::State::Live:    out->state = MK_TRK_LIVE;    break;
++        case TrackerFinder::State::Waiting: out->state = MK_TRK_WAITING; break;
++        case TrackerFinder::State::Lost:    out->state = MK_TRK_LOST;    break;
++        default:                            out->state = MK_TRK_PAUSED;  break;
++    }
++    int dir = 0;
++    out->trend_ready   = f.trend(now, run, dir) ? 1 : 0;
++    out->trend         = (int8_t)dir;
++    out->strength      = (int16_t)f.strength();
++    out->filtered_rssi = t.filtered_rssi;
++    out->age_ms        = f.age(now);
++    out->target_id     = t.id;
++    memcpy(out->mac, t.mac, 6);
++    out->type       = t.kind;
++    out->scan_fresh = t.scan_fresh ? 1 : 0;
++
++    unsigned hc = f.historyCount();
++    if (hc > MK_TRK_HISTORY) hc = MK_TRK_HISTORY;
++    out->history_count = (uint16_t)hc;
++    for (unsigned i = 0; i < hc; i++) out->history[i] = f.history(i);
++}
++
++void mk_fox_set_channel(int channel) { s_fox.set_channel((uint8_t)channel); }
++
++/* ── EAPOL / PMKID capture ───────────────────────────────────────────── */
++int  mk_eapol_begin(int hop, int channel)
++{ return s_eapol.begin(hop != 0, (uint8_t)channel) ? 1 : 0; }
++void mk_eapol_loop(void)   { s_eapol.loop(); }
++void mk_eapol_pause(void)  { s_eapol.pause(); }
++void mk_eapol_resume(void) { s_eapol.resume(); }
++void mk_eapol_stop(void)   { s_eapol.stop(); }
++int  mk_eapol_running(void){ return s_eapol.running() ? 1 : 0; }
++
++void mk_eapol_stats(mk_eapol_stats_t* out)
++{
++    if (!out) return;
++    const EapolStats& st = s_eapol.stats();
++    out->frames     = st.frames;
++    out->targets    = st.targets;
++    out->pmkids     = st.pmkids;
++    out->handshakes = st.handshakes;
++    out->sae        = st.sae;
++    out->dropped    = st.dropped;
++    out->channel    = st.channel;
++    out->hopping    = st.hopping ? 1 : 0;
++    out->running    = st.running ? 1 : 0;
++    out->error      = st.error;
++    snprintf(out->path, sizeof(out->path), "%s", st.path);
++}
++
++int mk_eapol_list(mk_eapol_target_t* out, int max)
++{
++    if (!out || max <= 0) return 0;
++    static void* s_eap_buf = nullptr;
++    EapolTarget* tmp = (EapolTarget*)mk_psram_buf(&s_eap_buf, sizeof(EapolTarget) * (EapolCapture::MAX_TARGETS));
++    if (!tmp) return 0;
++    int n = s_eapol.list(tmp, max < EapolCapture::MAX_TARGETS ? max : EapolCapture::MAX_TARGETS);
++    for (int i = 0; i < n; i++) {
++        memcpy(out[i].bssid, tmp[i].bssid, 6);
++        memcpy(out[i].sta,   tmp[i].sta,   6);
++        out[i].msgs       = tmp[i].msgs;
++        out[i].have_pmkid = tmp[i].have_pmkid;
++        memcpy(out[i].pmkid, tmp[i].pmkid, 16);
++        out[i].rssi    = tmp[i].rssi;
++        out[i].channel = tmp[i].channel;
++    }
++    return n;
++}
++
++void mk_eapol_set_channel(int channel) { s_eapol.set_channel((uint8_t)channel); }
++
++/* ── Evil-twin / captive-portal detection ───────────────────────────── */
++void mk_pd_begin(void)  { s_pd.begin(); }
++void mk_pd_loop(void)   { s_pd.loop(); }
++void mk_pd_stop(void)   { s_pd.stop(); }
++int  mk_pd_running(void){ return s_pd.running() ? 1 : 0; }
++
++void mk_pd_stats(mk_pd_stats_t* out)
++{
++    if (!out) return;
++    const PortalStats& st = s_pd.stats();
++    out->ssids    = st.ssids;
++    out->flagged  = st.flagged;
++    out->scans    = st.scans;
++    out->scanning = st.scanning ? 1 : 0;
++    out->running  = st.running ? 1 : 0;
++    out->scan_rc     = st.scan_rc;
++    out->complete_rc = st.complete_rc;
++    out->raw_seen    = st.raw_seen;
++    out->accepted    = st.accepted;
++    out->rej_hidden  = st.rej_hidden;
++    out->rej_full    = st.rej_full;
++    out->rej_bssid   = st.rej_bssid;
++    out->table_ok    = st.table_ok ? 1 : 0;
++}
++
++int mk_pd_list(mk_pd_ssid_t* out, int max)
++{
++    if (!out || max <= 0) return 0;
++    static void* s_pd_buf = nullptr;
++    PortalSsidInfo* tmp = (PortalSsidInfo*)mk_psram_buf(&s_pd_buf, sizeof(PortalSsidInfo) * (PortalDetect::MAX_SSIDS));
++    if (!tmp) return 0;
++    int n = s_pd.list(tmp, max < PortalDetect::MAX_SSIDS ? max : PortalDetect::MAX_SSIDS);
++    for (int i = 0; i < n; i++) {
++        snprintf(out[i].ssid, sizeof(out[i].ssid), "%s", tmp[i].ssid);
++        out[i].n_bssid    = tmp[i].n_bssid;
++        out[i].flags      = tmp[i].flags;
++        out[i].best_rssi  = tmp[i].best_rssi;
++        out[i].first_auth = tmp[i].first_auth;
++        const int m = tmp[i].n_bssid < MK_PD_PER ? tmp[i].n_bssid : MK_PD_PER;
++        for (int k = 0; k < m; k++) {
++            memcpy(out[i].ap[k].bssid, tmp[i].ap[k].bssid, 6);
++            out[i].ap[k].channel = tmp[i].ap[k].channel;
++            out[i].ap[k].rssi    = tmp[i].ap[k].rssi;
++            out[i].ap[k].auth    = tmp[i].ap[k].auth;
++        }
++    }
++    return n;
++}
++
++int  mk_pd_probe_begin(const char* ssid) { return s_pd.probe_begin(ssid) ? 1 : 0; }
++void mk_pd_probe_stop(void)              { s_pd.probe_stop(); }
++
++void mk_pd_probe(mk_pd_probe_t* out)
++{
++    if (!out) return;
++    const PortalProbeResult& p = s_pd.probe();
++    snprintf(out->ssid, sizeof(out->ssid), "%s", p.ssid);
++    out->state      = p.state;
++    out->verdict    = p.verdict;
++    out->http_code  = p.http_code;
++    snprintf(out->redirect, sizeof(out->redirect), "%s", p.redirect);
++    out->elapsed_ms  = p.elapsed_ms;
++    out->rogue_flags = p.rogue_flags;
++    out->rogue_conf  = p.rogue_conf;
++    snprintf(out->gateway, sizeof(out->gateway), "%s", p.gateway);
++    snprintf(out->server,  sizeof(out->server),  "%s", p.server);
++    out->rtt_ms      = p.rtt_ms;
++}
++
++/* ── Per-AP security audit ──────────────────────────────────────────── */
++void mk_wa_begin(void)  { s_wa.begin(); }
++void mk_wa_loop(void)   { s_wa.loop(); }
++void mk_wa_pause(void)  { s_wa.pause(); }
++void mk_wa_resume(void) { s_wa.resume(); }
++void mk_wa_stop(void)   { s_wa.stop(); }
++int  mk_wa_running(void){ return s_wa.running() ? 1 : 0; }
++
++void mk_wa_stats(mk_wa_stats_t* out)
++{
++    if (!out) return;
++    const AuditStats& st = s_wa.stats();
++    out->aps      = st.aps;
++    out->at_risk  = st.at_risk;
++    out->wps_open = st.wps_open;
++    out->no_pmf   = st.no_pmf;
++    out->channel  = st.channel;
++    out->hopping  = st.hopping ? 1 : 0;
++    out->running  = st.running ? 1 : 0;
++}
++
++int mk_wa_list(mk_wa_ap_t* out, int max)
++{
++    if (!out || max <= 0) return 0;
++    static void* s_wa_buf = nullptr;
++    AuditAp* tmp = (AuditAp*)mk_psram_buf(&s_wa_buf, sizeof(AuditAp) * (WifiAudit::MAX_APS));
++    if (!tmp) return 0;
++    int n = s_wa.list(tmp, max < WifiAudit::MAX_APS ? max : WifiAudit::MAX_APS);
++    for (int i = 0; i < n; i++) {
++        memcpy(out[i].bssid, tmp[i].bssid, 6);
++        snprintf(out[i].ssid, sizeof(out[i].ssid), "%s", tmp[i].ssid);
++        out[i].channel    = tmp[i].channel;
++        out[i].rssi       = tmp[i].rssi;
++        out[i].flags      = tmp[i].flags;
++        out[i].pairwise   = tmp[i].pairwise;
++        out[i].group      = tmp[i].group;
++        out[i].akm        = tmp[i].akm;
++        out[i].wps_state  = tmp[i].wps_state;
++        out[i].wps_locked = tmp[i].wps_locked;
++        out[i].findings   = tmp[i].findings;
++        out[i].ie_count   = tmp[i].ie_count;
++        out[i].ie_vendor  = tmp[i].ie_vendor;
++        out[i].ie_mask    = tmp[i].ie_mask;
++    }
++    return n;
++}
++
++void mk_wa_set_channel(int channel) { s_wa.set_channel((uint8_t)channel); }
++
++/* ── Evil twin + captive portal ─────────────────────────────────────── */
++int mk_twin_begin(const char* ssid, const char* portal, int channel)
++{
++    return s_twin.begin(ssid, portal, (uint8_t)channel) ? 1 : 0;
++}
++void mk_twin_loop(void)   { s_twin.loop(); }
++void mk_twin_stop(void)   { s_twin.stop(); }
++int  mk_twin_running(void){ return s_twin.running() ? 1 : 0; }
++void mk_twin_clear(void)  { s_twin.clear_captures(); }
++
++void mk_twin_stats(mk_twin_stats_t* out)
++{
++    if (!out) return;
++    const TwinStats& st = s_twin.stats();
++    snprintf(out->ssid,   sizeof(out->ssid),   "%s", st.ssid);
++    snprintf(out->portal, sizeof(out->portal), "%s", st.portal);
++    out->clients  = st.clients;
++    out->seen     = st.seen;
++    out->submits  = st.submits;
++    out->requests = st.requests;
++    out->channel  = st.channel;
++    out->running  = st.running ? 1 : 0;
++    out->sd_ok    = st.sd_ok ? 1 : 0;
++}
++
++int mk_twin_clients(mk_twin_client_t* out, int max)
++{
++    if (!out || max <= 0) return 0;
++    static void* s_twc_buf = nullptr;
++    TwinClient* tmp = (TwinClient*)mk_psram_buf(&s_twc_buf, sizeof(TwinClient) * (EvilTwin::MAX_CLIENTS));
++    if (!tmp) return 0;
++    int n = s_twin.clients(tmp, max < EvilTwin::MAX_CLIENTS ? max : EvilTwin::MAX_CLIENTS);
++    for (int i = 0; i < n; i++) {
++        memcpy(out[i].mac, tmp[i].mac, 6);
++        out[i].joined_ms = tmp[i].joined_ms;
++        out[i].submitted = tmp[i].submitted;
++    }
++    return n;
++}
++
++int mk_twin_captures(mk_twin_cap_t* out, int max)
++{
++    if (!out || max <= 0) return 0;
++    static void* s_twp_buf = nullptr;
++    TwinCapture* tmp = (TwinCapture*)mk_psram_buf(&s_twp_buf, sizeof(TwinCapture) * (EvilTwin::MAX_CAPTURES));
++    if (!tmp) return 0;
++    int n = s_twin.captures(tmp, max < EvilTwin::MAX_CAPTURES ? max : EvilTwin::MAX_CAPTURES);
++    for (int i = 0; i < n; i++) {
++        memcpy(out[i].mac, tmp[i].mac, 6);
++        out[i].ms = tmp[i].ms;
++        snprintf(out[i].field1, sizeof(out[i].field1), "%s", tmp[i].field1);
++        snprintf(out[i].field2, sizeof(out[i].field2), "%s", tmp[i].field2);
++    }
++    return n;
++}
++
++/* ── Rogue-tool detection ───────────────────────────────────────────── */
++int  mk_td_begin(int mode) { return s_td.begin((uint8_t)mode) ? 1 : 0; }
++void mk_td_loop(void)      { s_td.loop(); }
++void mk_td_stop(void)      { s_td.stop(); }
++int  mk_td_running(void)   { return s_td.running() ? 1 : 0; }
++void mk_td_set_channel(int channel) { s_td.set_channel((uint8_t)channel); }
++
++unsigned    mk_crumb_last_id(void)   { return mk_crumb_last(); }
++const char* mk_crumb_last_name(void) { return mk_crumb_name(mk_crumb_last()); }
++unsigned    mk_crumb_reset_id(void)  { return mk_crumb_reset_reason(); }
++const char* mk_crumb_reset_str(void) { return mk_crumb_reset_name(mk_crumb_reset_reason()); }
++
++void mk_td_stats(mk_td_stats_t* out)
++{
++    if (!out) return;
++    const ToolStats& st = s_td.stats();
++    out->hits      = st.hits;
++    out->high_conf = st.high_conf;
++    out->tracked   = st.tracked;
++    out->mode      = st.mode;
++    out->channel   = st.channel;
++    out->hopping   = st.hopping ? 1 : 0;
++    out->running   = st.running ? 1 : 0;
++    out->ble_error = st.ble_error ? 1 : 0;
++}
++
++int mk_td_list(mk_td_hit_t* out, int max)
++{
++    if (!out || max <= 0) return 0;
++    static void* s_td_buf = nullptr;
++    ToolHit* tmp = (ToolHit*)mk_psram_buf(&s_td_buf, sizeof(ToolHit) * (ToolDetect::MAX_HITS));
++    if (!tmp) return 0;
++    int n = s_td.list(tmp, max < ToolDetect::MAX_HITS ? max : ToolDetect::MAX_HITS);
++    for (int i = 0; i < n; i++) {
++        memcpy(out[i].mac, tmp[i].mac, 6);
++        out[i].kind       = tmp[i].kind;
++        out[i].radio      = tmp[i].radio;
++        out[i].confidence = tmp[i].confidence;
++        out[i].rssi       = tmp[i].rssi;
++        out[i].channel    = tmp[i].channel;
++        snprintf(out[i].label, sizeof(out[i].label), "%s", tmp[i].label);
++        out[i].ssid_count = tmp[i].ssid_count;
++        out[i].count      = tmp[i].count;
++        out[i].ad_mask    = tmp[i].ad_mask;
++        out[i].mfg_id     = tmp[i].mfg_id;
++        out[i].uuid16     = tmp[i].uuid16;
++        out[i].evidence   = tmp[i].evidence;
++        out[i].first_ms   = tmp[i].first_ms;
++        out[i].last_ms    = tmp[i].last_ms;
++    }
++    return n;
++}
++
++uint32_t mk_abi_version(void) { return MK_ABI_VERSION; }
++
+ static const struct esp_elfsym MK_SDK_SYMS[] = {
++    { "mk_abi_version",   (const void*)&mk_abi_version },
+     { "mk_gfx_clear",     (const void*)&mk_gfx_clear },
+     { "mk_gfx_header",    (const void*)&mk_gfx_header },
+     { "mk_gfx_footer",    (const void*)&mk_gfx_footer },
+@@ -610,6 +1021,72 @@ static const struct esp_elfsym MK_SDK_SYMS[] = {
+     { "mk_media_status",     (const void*)&mk_media_status },
+     { "mk_media_tracks",     (const void*)&mk_media_tracks },
+     { "mk_media_set_output", (const void*)&mk_media_set_output },
++    { "mk_td_begin",         (const void*)&mk_td_begin },
++    { "mk_td_loop",          (const void*)&mk_td_loop },
++    { "mk_td_stop",          (const void*)&mk_td_stop },
++    { "mk_td_running",       (const void*)&mk_td_running },
++    { "mk_td_stats",         (const void*)&mk_td_stats },
++    { "mk_td_list",          (const void*)&mk_td_list },
++    { "mk_td_set_channel",   (const void*)&mk_td_set_channel },
++    { "mk_crumb_last_id",    (const void*)&mk_crumb_last_id },
++    { "mk_crumb_last_name",  (const void*)&mk_crumb_last_name },
++    { "mk_crumb_reset_id",   (const void*)&mk_crumb_reset_id },
++    { "mk_crumb_reset_str",  (const void*)&mk_crumb_reset_str },
++    { "mk_wa_begin",         (const void*)&mk_wa_begin },
++    { "mk_wa_loop",          (const void*)&mk_wa_loop },
++    { "mk_wa_pause",         (const void*)&mk_wa_pause },
++    { "mk_wa_resume",        (const void*)&mk_wa_resume },
++    { "mk_wa_stop",          (const void*)&mk_wa_stop },
++    { "mk_wa_running",       (const void*)&mk_wa_running },
++    { "mk_wa_stats",         (const void*)&mk_wa_stats },
++    { "mk_wa_list",          (const void*)&mk_wa_list },
++    { "mk_wa_set_channel",   (const void*)&mk_wa_set_channel },
++    { "mk_twin_begin",       (const void*)&mk_twin_begin },
++    { "mk_twin_loop",        (const void*)&mk_twin_loop },
++    { "mk_twin_stop",        (const void*)&mk_twin_stop },
++    { "mk_twin_running",     (const void*)&mk_twin_running },
++    { "mk_twin_stats",       (const void*)&mk_twin_stats },
++    { "mk_twin_clients",     (const void*)&mk_twin_clients },
++    { "mk_twin_captures",    (const void*)&mk_twin_captures },
++    { "mk_twin_clear",       (const void*)&mk_twin_clear },
++    { "mk_pd_begin",         (const void*)&mk_pd_begin },
++    { "mk_pd_loop",          (const void*)&mk_pd_loop },
++    { "mk_pd_stop",          (const void*)&mk_pd_stop },
++    { "mk_pd_running",       (const void*)&mk_pd_running },
++    { "mk_pd_stats",         (const void*)&mk_pd_stats },
++    { "mk_pd_list",          (const void*)&mk_pd_list },
++    { "mk_pd_probe_begin",   (const void*)&mk_pd_probe_begin },
++    { "mk_pd_probe_stop",    (const void*)&mk_pd_probe_stop },
++    { "mk_pd_probe",         (const void*)&mk_pd_probe },
++    { "mk_fox_begin",        (const void*)&mk_fox_begin },
++    { "mk_fox_loop",         (const void*)&mk_fox_loop },
++    { "mk_fox_pause",        (const void*)&mk_fox_pause },
++    { "mk_fox_resume",       (const void*)&mk_fox_resume },
++    { "mk_fox_stop",         (const void*)&mk_fox_stop },
++    { "mk_fox_running",      (const void*)&mk_fox_running },
++    { "mk_fox_stats",        (const void*)&mk_fox_stats },
++    { "mk_fox_list",         (const void*)&mk_fox_list },
++    { "mk_fox_select",       (const void*)&mk_fox_select },
++    { "mk_fox_finder",       (const void*)&mk_fox_finder },
++    { "mk_fox_set_channel",  (const void*)&mk_fox_set_channel },
++    { "mk_eapol_begin",      (const void*)&mk_eapol_begin },
++    { "mk_eapol_loop",       (const void*)&mk_eapol_loop },
++    { "mk_eapol_pause",      (const void*)&mk_eapol_pause },
++    { "mk_eapol_resume",     (const void*)&mk_eapol_resume },
++    { "mk_eapol_stop",       (const void*)&mk_eapol_stop },
++    { "mk_eapol_running",    (const void*)&mk_eapol_running },
++    { "mk_eapol_stats",      (const void*)&mk_eapol_stats },
++    { "mk_eapol_list",       (const void*)&mk_eapol_list },
++    { "mk_eapol_set_channel",(const void*)&mk_eapol_set_channel },
++    { "mk_pcap_begin",       (const void*)&mk_pcap_begin },
++    { "mk_pcap_loop",        (const void*)&mk_pcap_loop },
++    { "mk_pcap_pause",       (const void*)&mk_pcap_pause },
++    { "mk_pcap_resume",      (const void*)&mk_pcap_resume },
++    { "mk_pcap_stop",        (const void*)&mk_pcap_stop },
++    { "mk_pcap_running",     (const void*)&mk_pcap_running },
++    { "mk_pcap_stats",       (const void*)&mk_pcap_stats },
++    { "mk_pcap_history",     (const void*)&mk_pcap_history },
++    { "mk_pcap_set_channel", (const void*)&mk_pcap_set_channel },
+     { "mk_input_poll",    (const void*)&mk_input_poll },
+     { "mk_btn",           (const void*)&mk_btn },
+     { "mk_btn_long",      (const void*)&mk_btn_long },

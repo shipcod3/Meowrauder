@@ -1,0 +1,12 @@
+# meowkit-sim — SDL2 + CMake for the two headless desktop UI simulators
+# (sim/ = LVGL system screens, sim/tui/ = LovyanGFX MK_TUI app screens) and for
+# the native-app sim in sim/app/. Headless: SDL_VIDEODRIVER=dummy, no display.
+FROM debian:bookworm-slim
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      build-essential cmake pkg-config libsdl2-dev ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /work
+CMD ["bash"]
