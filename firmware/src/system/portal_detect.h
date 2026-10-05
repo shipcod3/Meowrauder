@@ -122,7 +122,13 @@ public:
      * cheap. */
     static constexpr int MAX_SSIDS   = 96;
     static constexpr int MAX_PER     = 4;    /* BSSIDs kept per SSID */
-    static constexpr int SCAN_GAP_MS = 4000;
+    /* Gap between sweeps. Shorter than before: the scan no longer blocks
+     * the UI, so a faster refresh costs nothing in responsiveness. */
+    static constexpr int SCAN_GAP_MS = 2500;
+
+    /* A scan that has not reported done by now is treated as stalled. The
+     * driver's own sweep is ~4 s at 300 ms/channel, so this is generous. */
+    static constexpr int SCAN_STALL_MS = 12000;
 
     void begin();
     void stop();
@@ -147,6 +153,15 @@ private:
     uint32_t    _probe_started = 0;
 
     void _harvest(const wifi_ap_record_t* recs, int n);
+    void _collect();
+
+    /* A scan is in flight. This member existed once, was removed when the
+     * scan became blocking, and is back because blocking was the wrong
+     * trade: esp_wifi_scan_start(block=true) stalls the caller for ~4 s and
+     * mk_pd_loop() runs on the UI task, so the screen ignored input for
+     * roughly half of every cycle. */
+    bool     _scan_busy = false;
+    uint32_t _scan_started = 0;
     void _score_rogue();
     void _analyse();
 };

@@ -1,5 +1,62 @@
 # Changelog
 
+## 0.4.0 — touch navigation
+
+### Added — touch, because a button failed
+
+FeralCat v0.11.2 made the launcher's apps menu tappable. That is LVGL, and a
+native app driving `mk_gfx` has no LVGL indev, so Meowrauder could not see
+the panel at all — upstream's one ABI addition in that release was
+`mk_tracker_beep`, unrelated. **ABI 4 -> 5** adds `mk_touch_get()` and
+`mk_touch_available()`, reading the same FT6336 directly.
+
+A tap synthesises the button press it stands for, so all nineteen screens
+gained touch without their handlers changing, and buttons keep working.
+
+| Tap | Does |
+|---|---|
+| header strip, full width | back |
+| footer right | back |
+| footer left | `A` |
+| either back zone on the menu | exit the app |
+| a tool on the menu | select and open |
+| a row on any list | select |
+
+Back has two zones and the menu's zones exit the app. That asymmetry is the
+point: until now only a long press on `B` could leave Meowrauder, and the
+unit this was written for has a failing `B`. A screen you cannot leave is
+worse than one you cannot enter.
+
+Two defects caught by checking the geometry rather than eyeballing it:
+
+* A tap sets `isel` from a y coordinate, and `draw_audit_detail(&g_wa[isel])`
+  indexes with no bounds check of its own. That was safe only because `isel`
+  could previously move only via `Up`/`Down`, which are bounded by the list
+  length; a tap would have run straight past the end of a short list. Clamped
+  per screen.
+* The footer zone at `y >= 212` overlapped the menu's sixth visible row
+  (`y 185..216`, from `CONTENT_Y` 25 + 5 x `ITEM_H` 32), so the bottom of a
+  selectable row would have triggered back. It starts at 217.
+
+### Fixed — Portal Check ignored input half the time
+
+`esp_wifi_scan_start(&cfg, block=true)` stalls the calling task for about
+four seconds, and `mk_pd_loop()` runs on the UI task. The screen therefore
+ignored input for roughly half of every cycle and scrolling felt dead. That
+trade was made knowingly in 0.3.0 when the scan was fixed, and it was the
+wrong one.
+
+The scan is non-blocking now, polled through `WiFi.scanComplete()`. This is
+safe where the *first* async attempt was not: that one failed on the
+`WIFI_SCANNING_BIT` guard inside `WiFi.scanNetworks()`, and this path does
+not call the wrapper. A 12 s stall guard stops and clears the scanner rather
+than wedging it, and the sweep gap drops 4000 -> 2500 ms now that a faster
+refresh costs nothing in responsiveness.
+
+`log_scan()` was also writing to the SD card on every sweep, on the same
+task. It now writes only on an error, an empty result, or a change in the AP
+count — the cases it exists to diagnose. A steady state writes nothing.
+
 ## 0.3.0 — the two bugs that survived 0.2.0
 
 0.2.0 shipped with two faults it believed were fixed or unimportant: Rogue

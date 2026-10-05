@@ -557,6 +557,82 @@ static const char* td_kind_str(unsigned k)
 /* What the last unexpected reset was, and the last breadcrumb set before it.
  * Only shown when the previous boot actually died — a clean start prints
  * nothing, so this costs the user nothing in normal use. */
+
+/* ── Touch ────────────────────────────────────────────────────────────────
+ *
+ * FeralCat v0.11.2 made the launcher's apps menu tappable, but that is LVGL
+ * and a native app has no LVGL indev, so the panel had to be exposed through
+ * the ABI (mk_touch_get, ABI 5). This maps it onto the existing controls
+ * rather than inventing a parallel UI: a tap synthesises the button press it
+ * stands for, so every screen gets touch without its handler changing.
+ *
+ * Zones, chosen so Back is reachable two different ways — the device this
+ * was written for has a failing B button and a screen you cannot leave is
+ * worse than one you cannot enter:
+ *
+ *   header strip   (y < 24)            -> B / Back, full width, 320x24
+ *   footer right   (x >= 150, y >= 217) -> B / Back
+ *   footer left    (x <  150, y >= 217) -> A
+ *   content rows   (24 <= y < 217)      -> select that row; on the menu,
+ *                                          also activate it, matching how
+ *                                          the launcher's tiles behave
+ *
+ * The footer zone starts at 217 rather than the drawn 220 to give a 23 px
+ * target instead of 20 — a 20 px strip is small for a fingertip. It cannot
+ * go lower: the menu's sixth visible row occupies y 185..216 (CONTENT_Y 25 +
+ * 5 * ITEM_H 32), so a zone starting at 212 would swallow the bottom of a
+ * row the user can actually select. */
+#define TZ_NONE 0
+#define TZ_A    1
+#define TZ_B    2
+#define TZ_ROW  3
+
+static int  g_tap_a, g_tap_b;      /* synthesised button events */
+static int  g_tap_row = -1;        /* content row that was tapped, else -1 */
+static int  g_touch_ok;
+
+static int touch_zone(int x, int y, int *row_out)
+{
+    if (y < 24)  return TZ_B;                       /* header = back      */
+    if (y >= 217) return (x >= 150) ? TZ_B : TZ_A;  /* footer split       */
+    if (row_out) {
+        /* List screens draw rows at y = 50 + i*30; the menu uses the 32 px
+         * ITEM_H grid from CONTENT_Y = 25. Both land close enough that one
+         * mapping per screen kind is enough. */
+        *row_out = (g_screen == S_MENU) ? (y - 25) / 32 : (y - 50) / 30;
+        if (*row_out < 0) *row_out = 0;
+    }
+    return TZ_ROW;
+}
+
+/* Call once per frame, straight after mk_input_poll(). */
+static void touch_update(void)
+{
+    g_tap_row = -1;
+    if (!g_touch_ok) return;
+
+    mk_touch_t t;
+    mk_touch_get(&t);
+    if (!t.tapped) return;
+
+    int row = -1;
+    switch (touch_zone(t.up_x, t.up_y, &row)) {
+        case TZ_A:   g_tap_a = 1; break;
+        case TZ_B:   g_tap_b = 1; break;
+        case TZ_ROW: g_tap_row = row; break;
+        default: break;
+    }
+}
+
+/* Drop-in for mk_btn(): a tap is indistinguishable from the press it stands
+ * for, and is consumed on read so it fires exactly once. */
+static int btn(int id)
+{
+    if (id == MK_BTN_A && g_tap_a) { g_tap_a = 0; return 1; }
+    if (id == MK_BTN_B && g_tap_b) { g_tap_b = 0; return 1; }
+    return mk_btn(id);
+}
+
 static void draw_crumb(int y)
 {
     unsigned r = mk_crumb_reset_id();
@@ -1034,7 +1110,8 @@ int app_main(int argc, char** argv)
     if (fw_abi != MK_ABI_VERSION) {
         for (int i = 0; i < 400; i++) {
             mk_input_poll();
-            if (mk_btn(MK_BTN_B) || mk_btn_long(MK_BTN_B) || mk_btn(MK_BTN_A)) break;
+            touch_update();
+            if (btn(MK_BTN_B) || mk_btn_long(MK_BTN_B) || btn(MK_BTN_A)) break;
             if (i == 0) {
                 char b[48];
                 mk_gfx_clear();
@@ -1055,6 +1132,7 @@ int app_main(int argc, char** argv)
         return -1;
     }
 
+    g_touch_ok = mk_touch_available();
     mk_wifi_begin();
 
     int sel = 0, scroll = 0;
@@ -1064,19 +1142,54 @@ int app_main(int argc, char** argv)
 
     for (;;) {
         mk_input_poll();
+        touch_update();
         service_pump();
 
         if (mk_btn_long(MK_BTN_B)) break;          /* hold B → exit anywhere */
 
+        /* Tapping a row selects it on every list screen. The menu handles
+         * its own rows below, because there a tap should also open.
+         *
+         * The clamp is load-bearing: isel indexes g_wa[]/g_td[] in the detail
+         * draws with no bounds check of their own. Until now isel could only
+         * move via UP/DOWN, which are bounded by the list length; a tap comes
+         * from a y coordinate and would happily run past the end. */
+        if (g_tap_row >= 0 && g_screen != S_MENU) {
+            int n = 0;
+            switch (g_screen) {
+                case S_AUDIT:  n = g_wa_n; break;
+                case S_TOOLS:  n = g_td_n; break;
+                case S_PORTAL: n = g_pd_n; break;
+                /* mk_fox_list(NULL, 0) returns 0 by contract, so the count
+                 * has to come from the stats block. */
+                case S_WFOX: { mk_fox_stats_t fs; mk_fox_stats(&fs);
+                               n = (int)fs.targets; break; }
+                default:       n = 0; break;
+            }
+            const int cand = iscroll + g_tap_row;
+            if (n > 0 && cand >= 0 && cand < n) { isel = cand; dirty = 1; }
+            g_tap_row = -1;
+        }
+
         if (g_screen == S_MENU) {
+            /* Back on the menu has nowhere to go, so it exits the app. That
+             * is the touch route out: holding B is otherwise the only way,
+             * and on a device with a failing B button there would be none. */
+            if (g_tap_b) { g_tap_b = 0; break; }
             int vis = mk_content_rows();
-            if (mk_btn(MK_BTN_UP) && sel > 0) {
+            if (btn(MK_BTN_UP) && sel > 0) {
                 sel--; if (sel < scroll) scroll = sel; dirty = 1;
             }
-            if (mk_btn(MK_BTN_DOWN) && sel < MENU_N - 1) {
+            if (btn(MK_BTN_DOWN) && sel < MENU_N - 1) {
                 sel++; if (sel >= scroll + vis) scroll = sel - vis + 1; dirty = 1;
             }
-            if (mk_btn(MK_BTN_A)) {
+            if (g_tap_row >= 0 && scroll + g_tap_row < MENU_N) {
+                sel = scroll + g_tap_row;
+                g_tap_row = -1;
+                g_tap_a = 1;               /* tap a tile to open it */
+                dirty = 1;
+            }
+            if (btn(MK_BTN_A)) {
                 g_screen = MENU_SCREEN[sel];
                 isel = 0; iscroll = 0;
                 if (g_screen == S_CHAN) do_scan();
@@ -1085,69 +1198,69 @@ int app_main(int argc, char** argv)
             }
         }
         else if (g_screen == S_CHAN) {
-            if (mk_btn(MK_BTN_A)) { do_scan(); dirty = 1; }
-            if (mk_btn(MK_BTN_B)) { g_screen = S_MENU; dirty = 1; }
+            if (btn(MK_BTN_A)) { do_scan(); dirty = 1; }
+            if (btn(MK_BTN_B)) { g_screen = S_MENU; dirty = 1; }
         }
         else if (g_screen == S_PCAP) {
             mk_pcap_stats_t st; mk_pcap_stats(&st);
-            if (mk_btn(MK_BTN_A)) {
+            if (btn(MK_BTN_A)) {
                 if (st.running) mk_pcap_stop();
                 else          { mk_pcap_begin(1, 1); g_active = S_PCAP; }
                 dirty = 1;
             }
-            if (mk_btn(MK_BTN_UP))    { mk_pcap_set_channel(0); dirty = 1; }
-            if (mk_btn(MK_BTN_LEFT))  { int c = st.channel > 1  ? st.channel - 1 : 13;
+            if (btn(MK_BTN_UP))    { mk_pcap_set_channel(0); dirty = 1; }
+            if (btn(MK_BTN_LEFT))  { int c = st.channel > 1  ? st.channel - 1 : 13;
                                         mk_pcap_set_channel(c); dirty = 1; }
-            if (mk_btn(MK_BTN_RIGHT)) { int c = st.channel < 13 ? st.channel + 1 : 1;
+            if (btn(MK_BTN_RIGHT)) { int c = st.channel < 13 ? st.channel + 1 : 1;
                                         mk_pcap_set_channel(c); dirty = 1; }
-            if (mk_btn(MK_BTN_B)) { services_stop(); g_screen = S_MENU; dirty = 1; }
+            if (btn(MK_BTN_B)) { services_stop(); g_screen = S_MENU; dirty = 1; }
             uint32_t now = mk_millis();
             if (now - last_refresh >= 250) { last_refresh = now; dirty = 1; }
         }
         else if (g_screen == S_PMKID) {
             mk_eapol_stats_t es; mk_eapol_stats(&es);
-            if (mk_btn(MK_BTN_A)) {
+            if (btn(MK_BTN_A)) {
                 if (es.running) mk_eapol_stop();
                 else          { mk_eapol_begin(1, 1); g_active = S_PMKID; }
                 dirty = 1;
             }
-            if (mk_btn(MK_BTN_B)) { services_stop(); g_screen = S_MENU; dirty = 1; }
+            if (btn(MK_BTN_B)) { services_stop(); g_screen = S_MENU; dirty = 1; }
             uint32_t now = mk_millis();
             if (now - last_refresh >= 400) { last_refresh = now; dirty = 1; }
         }
         else if (g_screen == S_AUDIT) {
-            if (mk_btn(MK_BTN_UP) && isel > 0) {
+            if (btn(MK_BTN_UP) && isel > 0) {
                 isel--; if (isel < iscroll) iscroll = isel; dirty = 1;
             }
-            if (mk_btn(MK_BTN_DOWN) && isel < g_wa_n - 1) {
+            if (btn(MK_BTN_DOWN) && isel < g_wa_n - 1) {
                 isel++; if (isel >= iscroll + 5) iscroll = isel - 4; dirty = 1;
             }
-            if (mk_btn(MK_BTN_A) && g_wa_n > 0) { g_screen = S_AUDITDETAIL; dirty = 1; }
-            if (mk_btn(MK_BTN_B)) { services_stop(); g_screen = S_MENU; dirty = 1; }
+            if (btn(MK_BTN_A) && g_wa_n > 0) { g_screen = S_AUDITDETAIL; dirty = 1; }
+            if (btn(MK_BTN_B)) { services_stop(); g_screen = S_MENU; dirty = 1; }
             uint32_t now = mk_millis();
             if (now - last_refresh >= 600) { last_refresh = now; dirty = 1; }
         }
         else if (g_screen == S_AUDITDETAIL) {
             /* The twin is only reachable from a selected AP, so the SSID it
              * clones is always one the operator picked deliberately. */
-            if (mk_btn(MK_BTN_A) && g_wa_n > 0 && isel < g_wa_n &&
+            if (btn(MK_BTN_A) && g_wa_n > 0 && isel < g_wa_n &&
                 g_wa[isel].ssid[0]) {          /* need a name to impersonate */
                 services_stop();
                 g_active = S_TWIN;
                 g_screen = S_TWIN;
                 dirty = 1;
             }
-            if (mk_btn(MK_BTN_B)) { g_screen = S_AUDIT; dirty = 1; }
+            if (btn(MK_BTN_B)) { g_screen = S_AUDIT; dirty = 1; }
         }
         else if (g_screen == S_TWIN) {
             mk_twin_stats_t ts; mk_twin_stats(&ts);
-            if (mk_btn(MK_BTN_A)) {
+            if (btn(MK_BTN_A)) {
                 if (ts.running) mk_twin_stop();
                 else if (g_wa_n > 0 && isel < g_wa_n)
                     mk_twin_begin(g_wa[isel].ssid, "default", g_wa[isel].channel);
                 dirty = 1;
             }
-            if (mk_btn(MK_BTN_B)) {
+            if (btn(MK_BTN_B)) {
                 mk_twin_stop();
                 g_active = 0;
                 g_screen = S_AUDITDETAIL;
@@ -1158,13 +1271,13 @@ int app_main(int argc, char** argv)
         }
         else if (g_screen == S_TOOLS) {
             mk_td_stats_t ts; mk_td_stats(&ts);
-            if (mk_btn(MK_BTN_UP) && isel > 0) {
+            if (btn(MK_BTN_UP) && isel > 0) {
                 isel--; if (isel < iscroll) iscroll = isel; dirty = 1;
             }
-            if (mk_btn(MK_BTN_DOWN) && isel < g_td_n - 1) {
+            if (btn(MK_BTN_DOWN) && isel < g_td_n - 1) {
                 isel++; if (isel >= iscroll + 5) iscroll = isel - 4; dirty = 1;
             }
-            if (mk_btn(MK_BTN_A)) {
+            if (btn(MK_BTN_A)) {
                 if (g_td_n > 0 && isel < g_td_n) { g_screen = S_TOOLDETAIL; }
                 else {
                     /* nothing listed yet: A swaps radio, since the two contend */
@@ -1175,7 +1288,7 @@ int app_main(int argc, char** argv)
                 }
                 dirty = 1;
             }
-            if (mk_btn(MK_BTN_LEFT) || mk_btn(MK_BTN_RIGHT)) {
+            if (btn(MK_BTN_LEFT) || btn(MK_BTN_RIGHT)) {
                 mk_td_stop();
                 mk_td_begin(ts.mode == MK_TD_MODE_WIFI ? MK_TD_MODE_BLE
                                                        : MK_TD_MODE_WIFI);
@@ -1183,60 +1296,60 @@ int app_main(int argc, char** argv)
                 isel = 0; iscroll = 0;
                 dirty = 1;
             }
-            if (mk_btn(MK_BTN_B)) { services_stop(); g_screen = S_MENU; dirty = 1; }
+            if (btn(MK_BTN_B)) { services_stop(); g_screen = S_MENU; dirty = 1; }
             uint32_t now = mk_millis();
             if (now - last_refresh >= 500) { last_refresh = now; dirty = 1; }
         }
         else if (g_screen == S_TOOLDETAIL) {
-            if (mk_btn(MK_BTN_B)) { g_screen = S_TOOLS; dirty = 1; }
+            if (btn(MK_BTN_B)) { g_screen = S_TOOLS; dirty = 1; }
             uint32_t now = mk_millis();
             if (now - last_refresh >= 500) { last_refresh = now; dirty = 1; }
         }
         else if (g_screen == S_WFOX) {
             static mk_fox_target_t wl[MK_FOX_MAX];
             int n = mk_fox_list(wl, MK_FOX_MAX);
-            if (mk_btn(MK_BTN_UP) && isel > 0) {
+            if (btn(MK_BTN_UP) && isel > 0) {
                 isel--; if (isel < iscroll) iscroll = isel; dirty = 1;
             }
-            if (mk_btn(MK_BTN_DOWN) && isel < n - 1) {
+            if (btn(MK_BTN_DOWN) && isel < n - 1) {
                 isel++; if (isel >= iscroll + 5) iscroll = isel - 4; dirty = 1;
             }
-            if (mk_btn(MK_BTN_A) && n > 0 && isel < n) {
+            if (btn(MK_BTN_A) && n > 0 && isel < n) {
                 if (mk_fox_select(wl[isel].id)) { g_screen = S_WFOXHUNT; dirty = 1; }
             }
-            if (mk_btn(MK_BTN_B)) { services_stop(); g_screen = S_MENU; dirty = 1; }
+            if (btn(MK_BTN_B)) { services_stop(); g_screen = S_MENU; dirty = 1; }
             uint32_t now = mk_millis();
             if (now - last_refresh >= 400) { last_refresh = now; dirty = 1; }
         }
         else if (g_screen == S_WFOXHUNT) {
             mk_fox_loop();
-            if (mk_btn(MK_BTN_B)) { mk_fox_select(0); g_screen = S_WFOX; dirty = 1; }
+            if (btn(MK_BTN_B)) { mk_fox_select(0); g_screen = S_WFOX; dirty = 1; }
             uint32_t now = mk_millis();
             if (now - last_refresh >= 200) { last_refresh = now; dirty = 1; }
         }
         else if (g_screen == S_PORTAL) {
-            if (mk_btn(MK_BTN_UP) && isel > 0) {
+            if (btn(MK_BTN_UP) && isel > 0) {
                 isel--; if (isel < iscroll) iscroll = isel; dirty = 1;
             }
-            if (mk_btn(MK_BTN_DOWN) && isel < g_pd_n - 1) {
+            if (btn(MK_BTN_DOWN) && isel < g_pd_n - 1) {
                 isel++; if (isel >= iscroll + 5) iscroll = isel - 4; dirty = 1;
             }
-            if (mk_btn(MK_BTN_A) && g_pd_n > 0 && isel < g_pd_n) {
+            if (btn(MK_BTN_A) && g_pd_n > 0 && isel < g_pd_n) {
                 /* probe_begin refuses anything that is not open */
                 if (mk_pd_probe_begin(g_pd[isel].ssid)) { g_screen = S_PORTALPROBE; dirty = 1; }
             }
-            if (mk_btn(MK_BTN_B)) { services_stop(); g_screen = S_MENU; dirty = 1; }
+            if (btn(MK_BTN_B)) { services_stop(); g_screen = S_MENU; dirty = 1; }
             uint32_t now = mk_millis();
             if (now - last_refresh >= 500) { last_refresh = now; dirty = 1; }
         }
         else if (g_screen == S_PORTALPROBE) {
             mk_pd_loop();
             mk_pd_probe_t pp; mk_pd_probe(&pp);
-            if (mk_btn(MK_BTN_A) && (pp.state == MK_PD_PROBE_DONE ||
+            if (btn(MK_BTN_A) && (pp.state == MK_PD_PROBE_DONE ||
                                      pp.state == MK_PD_PROBE_FAILED)) {
                 mk_pd_probe_begin(g_pd[isel].ssid); dirty = 1;
             }
-            if (mk_btn(MK_BTN_B)) { mk_pd_probe_stop(); g_screen = S_PORTAL; dirty = 1; }
+            if (btn(MK_BTN_B)) { mk_pd_probe_stop(); g_screen = S_PORTAL; dirty = 1; }
             uint32_t now = mk_millis();
             if (now - last_refresh >= 250) { last_refresh = now; dirty = 1; }
         }

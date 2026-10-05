@@ -2,7 +2,9 @@
 
 <p align="center"><img src="docs/icon/meowrauder.png" width="160" alt="Meowrauder icon"></p>
 
-A **Marauder-style RF reconnaissance suite** for the [MeowKit-S3](https://meowkit.cc) (ESP32-S3) pocket multi-tool, built as a native app for the [FeralCat](https://github.com/FeralDevs/FeralCat) firmware.
+A **Marauder-style RF reconnaissance suite** for the [MeowKit-S3](https://meowkit.cc)
+(ESP32-S3) pocket multi-tool, built as a native signed app for the
+[FeralCat](https://github.com/FeralDevs/FeralCat) firmware.
 
 > ## ⚠️ Authorised use only
 > Everything here except one function is **receive-only** — it listens and
@@ -48,6 +50,14 @@ transmit deauth. None of that is duplicated here.
 | **Fox Hunt (WiFi)** | follow one AP or station by filtered signal strength — the existing radar is BLE-only | RX |
 | **Portal Check** | temporal evil-twin flags, an **active captive-portal probe**, and a weighted **rogue score** that separates a hostile portal from a legitimate one; nothing in FeralCat associates, so nothing else can detect a portal at all | RX + probe |
 | **Rogue Tools** | find Flipper Zero, Bruce, Pwnagotchi, WiFi Pineapple and deauthers nearby, on both radios | RX |
+
+Buttons and touch both work on every screen. FeralCat v0.11.2 made the
+launcher tappable, but that is LVGL and a native app has no LVGL indev, so
+the FT6336 is reached directly through `mk_touch_get()` (ABI 5). A tap
+synthesises the press it stands for. **Back has two tap zones and the menu's
+zones exit the app** — before this only a long press on `B` could leave, which
+is no use on a unit with a failed `B` button. See
+[`app/README.md`](app/README.md#touch) for the zone map.
 | **Evil Twin** | open SoftAP + DNS hijack + captive portal, for authorised social-engineering assessments | **TX** |
 
 ### Rogue Tools reports evidence, not verdicts
@@ -138,7 +148,7 @@ Every `mk_gfx_present()` writes the BMP. See [`sim/README.md`](sim/README.md).
 ## Status
 
 Verified in three stages — *compiles*, *runs in the simulator*, *confirmed on
-hardware*. 
+hardware*. The third is the only one that has ever caught anything.
 
 | Module | Hardware |
 |---|---|
@@ -199,4 +209,4 @@ the root of more than one of those nine.
 - **[MeowKit](https://github.com/mingolucky/meowkit-s3-firmware)** by
   *mingolucky* — the upstream open-source firmware.
 
-
+See [NOTICE](NOTICE) for licensing detail.

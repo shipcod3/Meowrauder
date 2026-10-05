@@ -1,0 +1,101 @@
+Meowrauder — attribution and licensing notes
+============================================
+
+Fill in your name in LICENSE before publishing.
+
+What this repository contains
+-----------------------------
+All source in this repository is original work, written against FeralCat's
+`mk_app` ABI. Specifically:
+
+  app/app_main.c                    the Meowrauder app
+  firmware/src/system/*.{h,cpp}     four capture/TX engines
+  firmware/src/ui/images/*.c        the app icon as an LVGL asset
+  firmware/patches/*.patch          additions to existing FeralCat files
+  sim/*                             the native-app simulator
+  tools/*                           build, icon and install helpers
+
+ESP32 Marauder
+--------------
+https://github.com/justcallmekoko/ESP32Marauder
+MIT License, Copyright (c) 2020 Just Call Me Koko
+
+Meowrauder follows Marauder's *function list* — what a tool of this kind should
+do, and the naming of several screens ("Fox Hunt"). **No Marauder source code is
+copied into this repository.** The engines here are written from scratch against
+FeralCat's ABI and ESP-IDF, and share no implementation with Marauder.
+
+Marauder is MIT licensed, so porting its code would be permissible if the
+copyright notice were carried across. Should any Marauder code be vendored here
+later, reproduce its MIT notice in this file and in the affected source.
+
+Bruce (detection signatures only — no code used)
+------------------------------------------------
+https://github.com/BruceDevices/firmware
+AGPL-3.0
+
+`tool_detect` recognises the default SSIDs Bruce uses for its evil portal and
+attack APs ("Free Wifi", "BruceAttack", "BruceBeacon"), read from its published
+source to avoid guessing. **No Bruce code is copied into this repository**, and
+none should be: Bruce is AGPL-3.0, and vendoring any of it would impose those
+terms on this project and arguably on FeralCat. Observing what a tool
+broadcasts is not derived work; copying its implementation would be.
+
+FeralCat
+--------
+https://github.com/FeralDevs/FeralCat
+
+The firmware this extends. At the time of writing FeralCat publishes **no
+LICENSE file**, so its own terms are unspecified.
+
+Two consequences:
+
+ 1. This repository deliberately does **not** vendor any FeralCat source. The
+    firmware side ships as new files plus patches, to be applied to a checkout
+    you obtain yourself.
+ 2. `firmware/patches/*.patch` contain short excerpts of FeralCat source as
+    diff context, which is unavoidable in a patch. If you intend to
+    redistribute anything FeralCat-derived, ask its maintainers to add a
+    licence first.
+
+`firmware/src/ui/images/ui_img_ic_meowrauder.c` includes FeralCat's `../ui.h`
+and uses its LVGL image-descriptor layout; the artwork and the generated data
+are original.
+
+Fox Hunt reuses FeralCat's `TrackerFinder` class (its signal-following state
+machine) by adapting WiFi targets onto its input type. That class is not copied
+here — the patch calls it in place.
+
+Flipper-IRDB (optional, not vendored)
+-------------------------------------
+https://github.com/logickworkshop/Flipper-IRDB
+
+A community-maintained collection of ~8,500 Flipper-format .ir remote files.
+`tools/install-ir-library.sh` copies such a library onto the SD card;
+**none of it is vendored into this repository** — it is a large third-party
+dataset and, at the revision inspected, carried no LICENSE file, so its terms
+are unclear. Obtain it yourself and check its licensing before redistributing.
+
+FeralCat's Infrared app reads the Flipper .ir format natively (it writes the
+same `Filetype: IR signals file` header), so the files are a drop-in.
+
+Portal templates
+----------------
+This repository ships **no portal pretext pages**. `evil_twin` reads whatever
+HTML is placed in `/portal/<name>.html` on the card and accepts submissions on
+both `/get` and `/login` by GET or POST, recording the first two non-empty form
+fields whatever they are named — so templates written for other ESP32 or
+Flipper portal tools work unmodified. Supplying a pretext, and confirming it is
+within an engagement's scope, is the operator's responsibility.
+
+MeowKit
+-------
+https://github.com/mingolucky/meowkit-s3-firmware
+The upstream open-source MeowKit-S3 firmware that FeralCat forks.
+
+Third-party components used at build time (not vendored here)
+-------------------------------------------------------------
+  LovyanGFX      — display/sprite library, via the FeralCat checkout (FreeBSD)
+  Monocypher     — Ed25519 verify for app signing, via FeralCat (CC0/BSD-2)
+  ESP-IDF        — Espressif (Apache-2.0)
+  SDL2           — simulator only (zlib)

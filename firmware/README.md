@@ -31,7 +31,7 @@ below).
 
 | Patch | File(s) | Why |
 |---|---|---|
-| `01-abi-declarations` | `src/system/mk_app_abi.h` | declares `mk_pcap_*`, `mk_fox_*`, `mk_eapol_*`, `mk_wa_*`, `mk_pd_*`, `mk_td_*`, `mk_et_*`, `mk_crumb_*`, and `MK_ABI_VERSION` (currently **4**) |
+| `01-abi-declarations` | `src/system/mk_app_abi.h` | declares `mk_pcap_*`, `mk_fox_*`, `mk_eapol_*`, `mk_wa_*`, `mk_pd_*`, `mk_td_*`, `mk_et_*`, `mk_crumb_*`, `mk_touch_*`, and `MK_ABI_VERSION` (currently **5**) |
 | `02-sdk-implement-and-export` | `src/system/app_sdk.cpp` | implements them and adds them to the ELF-loader symbol table |
 | `03-launcher-icon-mapping` | `src/app/app.h` | maps `icon=meowrauder` to the new asset |
 | `04-persist-tx-gate` | `src/system/persist.h` | adds `PKEY_TX_EN`, the active-TX gate |

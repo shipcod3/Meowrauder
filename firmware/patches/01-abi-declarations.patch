@@ -1,5 +1,5 @@
 diff --git a/src/system/mk_app_abi.h b/src/system/mk_app_abi.h
-index a681744..3f450b5 100644
+index a681744..0c94b22 100644
 --- a/src/system/mk_app_abi.h
 +++ b/src/system/mk_app_abi.h
 @@ -20,6 +20,21 @@
@@ -17,7 +17,7 @@ index a681744..3f450b5 100644
 + * should compare mk_abi_version() against the MK_ABI_VERSION it compiled with
 + * and refuse to run on a mismatch, which turns a baffling misbehaviour into
 + * one clear message. */
-+#define MK_ABI_VERSION 4
++#define MK_ABI_VERSION 5
 +
 +uint32_t mk_abi_version(void);
 +
@@ -448,3 +448,37 @@ index a681744..3f450b5 100644
  /* ── Media / audio player (MeowPlayer) ─────────────────────────────────────
   * The audio engine (ES8311 DAC + Helix MP3 decoder + I2S on a core-0 worker)
   * stays in firmware; the app drives it with commands and polls a status
+@@ -290,6 +722,33 @@ void mk_input_poll(void);       /* call once per loop before reading buttons */
+ int  mk_btn(int id);            /* 1 once per press (edge-triggered) */
+ int  mk_btn_long(int id);       /* 1 while the button is held long */
+ 
++/* ── Touch ─────────────────────────────────────────────────────────────── */
++
++/* The FT6336 panel, in display coordinates (0..MK_SCREEN_W-1, 0..MK_SCREEN_H-1).
++ *
++ * v0.11.2 made the launcher's apps menu tappable, but that is LVGL-side and
++ * native apps never saw it — an app driving mk_gfx has no LVGL indev. This
++ * exposes the same panel directly so an app can offer touch targets of its
++ * own. It matters for more than convenience: with a failed hardware button
++ * there may be no other way out of a screen.
++ *
++ * Read after mk_input_poll(), alongside mk_btn(). Touch does not replace the
++ * buttons; both work. */
++typedef struct {
++    int16_t x;          /* -1 when nothing is touching            */
++    int16_t y;
++    uint8_t pressed;    /* 1 for as long as a finger is down      */
++    uint8_t tapped;     /* 1 for exactly one poll, on release     */
++    int16_t up_x;       /* where the finger lifted (tap position) */
++    int16_t up_y;
++} mk_touch_t;
++
++void mk_touch_get(mk_touch_t* out);
++
++/* 1 if the panel is present and responding. An app should keep its button
++ * handling working regardless rather than assume touch exists. */
++int  mk_touch_available(void);
++
+ /* ── Misc ──────────────────────────────────────────────────────────────── */
+ void     mk_delay(uint32_t ms);
+ uint32_t mk_millis(void);

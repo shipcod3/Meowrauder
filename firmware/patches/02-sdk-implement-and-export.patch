@@ -1,5 +1,5 @@
 diff --git a/src/system/app_sdk.cpp b/src/system/app_sdk.cpp
-index 0490dcf..f4b8e30 100644
+index 0490dcf..64082d5 100644
 --- a/src/system/app_sdk.cpp
 +++ b/src/system/app_sdk.cpp
 @@ -8,6 +8,7 @@
@@ -39,7 +39,72 @@ index 0490dcf..f4b8e30 100644
  static TrackerMonitor s_tracker;
  static TrackerFinder  s_trkfinder;
  static uint32_t       s_trk_sel = 0;   /* selected candidate id (0 = none) */
-@@ -540,7 +556,402 @@ int mk_snprintf(char* buf, size_t n, const char* fmt, ...)
+@@ -500,14 +516,64 @@ void mk_media_set_output(int speaker)
+     if (s_dev) s_dev->io_exp.digitalWrite(HAL_IOEXP_PA_EN, speaker ? HIGH : LOW);
+ }
+ 
++/* Touch state, sampled once per mk_input_poll() so every read in a frame
++ * agrees and the tap edge fires exactly once. The panel is the same FT6336
++ * LVGL uses; while a native app is running LVGL is not driving it, so there
++ * is no contention. */
++static bool    s_touch_down  = false;
++static bool    s_touch_tap   = false;
++static int16_t s_touch_x     = -1,  s_touch_y  = -1;
++static int16_t s_touch_up_x  = -1,  s_touch_up_y = -1;
++
++static void touch_poll(void)
++{
++    if (!s_dev) return;
++    const bool down = s_dev->ctp.isTouched();
++
++    s_touch_tap = false;
++    if (down) {
++        int x = 0, y = 0;
++        s_dev->ctp.getPos(x, y);
++        /* Clamp rather than trust: a marginal read at the bezel can come
++         * back outside the panel and would put a tap target off-screen. */
++        if (x < 0) x = 0; if (x >= MK_SCREEN_W) x = MK_SCREEN_W - 1;
++        if (y < 0) y = 0; if (y >= MK_SCREEN_H) y = MK_SCREEN_H - 1;
++        s_touch_x = (int16_t)x;
++        s_touch_y = (int16_t)y;
++    } else if (s_touch_down) {
++        /* Release: report the tap once, at the last position seen while
++         * down. Acting on press instead would fire while the finger is
++         * still sliding across other targets. */
++        s_touch_tap  = true;
++        s_touch_up_x = s_touch_x;
++        s_touch_up_y = s_touch_y;
++        s_touch_x = s_touch_y = -1;
++    }
++    s_touch_down = down;
++}
++
+ void mk_input_poll(void)
+ {
+     if (!s_dev) return;
+     app_sleep_check();          /* power-button → sleep, works inside any app too */
+     s_dev->button.update();
+     s_dev->button.tick();
++    touch_poll();
++}
++
++void mk_touch_get(mk_touch_t* out)
++{
++    if (!out) return;
++    out->x       = s_touch_down ? s_touch_x : -1;
++    out->y       = s_touch_down ? s_touch_y : -1;
++    out->pressed = s_touch_down ? 1 : 0;
++    out->tapped  = s_touch_tap  ? 1 : 0;
++    out->up_x    = s_touch_up_x;
++    out->up_y    = s_touch_up_y;
+ }
+ 
++int mk_touch_available(void) { return s_dev ? 1 : 0; }
++
+ static Button_Class* btn_of(int id)
+ {
+     if (!s_dev) return nullptr;
+@@ -540,7 +606,402 @@ int mk_snprintf(char* buf, size_t n, const char* fmt, ...)
  } /* extern "C" */
  
  /* ── Exported symbol table (name → function) ────────────────────────────── */
@@ -442,7 +507,7 @@ index 0490dcf..f4b8e30 100644
      { "mk_gfx_clear",     (const void*)&mk_gfx_clear },
      { "mk_gfx_header",    (const void*)&mk_gfx_header },
      { "mk_gfx_footer",    (const void*)&mk_gfx_footer },
-@@ -610,6 +1021,72 @@ static const struct esp_elfsym MK_SDK_SYMS[] = {
+@@ -610,9 +1071,77 @@ static const struct esp_elfsym MK_SDK_SYMS[] = {
      { "mk_media_status",     (const void*)&mk_media_status },
      { "mk_media_tracks",     (const void*)&mk_media_tracks },
      { "mk_media_set_output", (const void*)&mk_media_set_output },
@@ -515,3 +580,8 @@ index 0490dcf..f4b8e30 100644
      { "mk_input_poll",    (const void*)&mk_input_poll },
      { "mk_btn",           (const void*)&mk_btn },
      { "mk_btn_long",      (const void*)&mk_btn_long },
++    { "mk_touch_get",       (const void*)&mk_touch_get },
++    { "mk_touch_available", (const void*)&mk_touch_available },
+     { "mk_delay",         (const void*)&mk_delay },
+     { "mk_millis",        (const void*)&mk_millis },
+     { "mk_snprintf",      (const void*)&mk_snprintf },

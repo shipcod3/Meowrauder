@@ -1,0 +1,5 @@
+# sha256 of each redacted sample, so a second run cannot
+# re-map addresses that are already stand-ins.
+a0e0c3e38a3fabc3aac5ff63fee1b678d36bbf51cd314dbcb09d93d93bf72f85  rf-survey-41-aps.txt
+d17a58bf1f1d983aad6318ed92bcc2f8018aba789406f815f5ff5c95b893cccf  sample-capture.pcap
+19e3b6d1acd111c645e043a3518483dd4651163b8fcc7faee4441a5cce155858  scan-log-6ap.txt

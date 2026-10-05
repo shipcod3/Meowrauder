@@ -50,6 +50,17 @@ static int  s_scan_src    = 0;   /* 0 none, 1 IDF, 2 Arduino store */
 static void log_scan(esp_err_t err, int num, const wifi_ap_record_t* recs,
                      const PortalStats& st)
 {
+    /* Opening, writing and closing a file on the card is not free, and this
+     * used to run on every sweep — on the UI task, next to a scan that was
+     * already stalling it. The log exists to diagnose a scan that returns
+     * nothing, so it is written when something is actually worth recording:
+     * an error, an empty result, or a change in what is visible. A steady
+     * state writes nothing. */
+    static int last_num = -1;
+    const bool worth_writing = (err != ESP_OK) || (num == 0) || (num != last_num);
+    last_num = num;
+    if (!worth_writing) return;
+
     SD_MMC.mkdir("/portal");
     File f = SD_MMC.open("/portal/scan.log",
                          s_log_started ? FILE_APPEND : FILE_WRITE);
@@ -294,6 +305,32 @@ void PortalDetect::loop()
     }
 
     const uint32_t now = millis();
+
+    /* A scan already running: check on it and return immediately. Never
+     * block here — this runs on the UI task. */
+    if (_scan_busy) {
+        const int r = WiFi.scanComplete();
+        if (r == WIFI_SCAN_RUNNING) {
+            if (now - _scan_started > SCAN_STALL_MS) {
+                /* Give up rather than wedge. scanComplete() is what clears
+                 * WIFI_SCANNING_BIT, so call it after stopping or the next
+                 * scan is refused. */
+                esp_wifi_scan_stop();
+                WiFi.scanComplete();
+                WiFi.scanDelete();
+                _scan_busy = false;
+                _stats.scanning = false;
+                _stats.scan_rc = -1;
+            }
+            return;
+        }
+        _scan_busy = false;
+        _stats.scanning = false;
+        _stats.scan_rc = 0;
+        _collect();
+        return;
+    }
+
     if (now - _last_scan < SCAN_GAP_MS) return;
     _last_scan = now;
 
@@ -324,11 +361,26 @@ void PortalDetect::loop()
     cfg.scan_time.active.min = 100;
     cfg.scan_time.active.max = 300;
 
-    _stats.scanning = true;
-    const esp_err_t err = esp_wifi_scan_start(&cfg, true /*block*/);
-    _stats.scanning = false;
-    _stats.scan_rc  = (int16_t)err;          /* 0 == ESP_OK */
+    /* Non-blocking. The original async attempt failed because Arduino's
+     * WiFi.scanNetworks() wrapper refuses to start while WIFI_SCANNING_BIT
+     * is set; that guard is in the wrapper, and this does not call it.
+     * Completion is read through WiFi.scanComplete(), which reports the bit
+     * Arduino's own SCAN_DONE handler sets — the path already proven to
+     * deliver the records here (src=2 on every logged scan). */
+    const esp_err_t err = esp_wifi_scan_start(&cfg, false /*non-blocking*/);
+    _stats.scan_rc = (int16_t)err;           /* 0 == ESP_OK */
     if (err != ESP_OK) { log_scan(err, 0, nullptr, _stats); return; }
+
+    _scan_busy = true;
+    _scan_started = now;
+    _stats.scanning = true;
+    return;
+}
+
+/* Fold a finished scan into the table. Split out of loop() so the start and
+ * the collect are not tangled together. */
+void PortalDetect::_collect()
+{
 
     /* Where the results actually are.
      *
@@ -348,7 +400,7 @@ void PortalDetect::loop()
     static void* slot = nullptr;
     wifi_ap_record_t* recs = (wifi_ap_record_t*)mk_psram_buf(
         &slot, sizeof(wifi_ap_record_t) * MAX_SSIDS);
-    if (!recs) { log_scan(err, 0, nullptr, _stats); return; }
+    if (!recs) { log_scan(ESP_ERR_NO_MEM, 0, nullptr, _stats); return; }
 
     uint16_t num = 0;
     if (esp_wifi_scan_get_ap_num(&num) != ESP_OK) num = 0;
@@ -378,7 +430,7 @@ void PortalDetect::loop()
     _stats.complete_rc = (int16_t)num;
     _harvest(recs, (int)num);
     _analyse();
-    log_scan(err, (int)num, recs, _stats);
+    log_scan(ESP_OK, (int)num, recs, _stats);
     WiFi.scanDelete();
 }
 
